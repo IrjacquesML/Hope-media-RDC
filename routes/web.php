@@ -11,6 +11,7 @@ use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\ResourceController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\LikeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -47,7 +48,24 @@ Route::prefix('enseignements')->name('posts.')->group(function () {
 });
 
 Route::post('/enseignements/{post}/commentaires', [CommentController::class, 'store'])
+    ->middleware('throttle:10,1')
     ->name('comments.store');
+
+Route::post('/actualites/{news}/commentaires', [CommentController::class, 'storeNews'])
+    ->middleware('throttle:10,1')
+    ->name('comments.news.store');
+
+// Likes (internautes, sans compte)
+Route::post('/likes/toggle/{post}', [LikeController::class, 'toggleLike'])
+    ->middleware('throttle:30,1')
+    ->name('likes.toggle');
+Route::get('/likes/check/{post}', [LikeController::class, 'checkLike'])
+    ->name('likes.check');
+Route::post('/likes/news/toggle/{news}', [LikeController::class, 'toggleNewsLike'])
+    ->middleware('throttle:30,1')
+    ->name('likes.news.toggle');
+Route::get('/likes/news/check/{news}', [LikeController::class, 'checkNewsLike'])
+    ->name('likes.news.check');
 
 // Routes Actualités / Écho de la mission (News)
 Route::prefix('actualites')->name('news.')->group(function () {
@@ -160,6 +178,13 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::get('/{heroSlide}/edit', [AdminController::class, 'editHeroSlide'])->name('edit');
         Route::put('/{heroSlide}', [AdminController::class, 'updateHeroSlide'])->name('update');
         Route::delete('/{heroSlide}', [AdminController::class, 'deleteHeroSlide'])->name('delete');
+    });
+
+    // Commentaires
+    Route::prefix('comments')->name('comments.')->group(function () {
+        Route::get('/', [AdminController::class, 'comments'])->name('index');
+        Route::post('/{comment}/reply', [AdminController::class, 'replyComment'])->name('reply');
+        Route::delete('/{comment}', [AdminController::class, 'deleteComment'])->name('delete');
     });
 
     // Newsletter

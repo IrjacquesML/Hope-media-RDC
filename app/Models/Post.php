@@ -87,7 +87,10 @@ class Post extends Model
      */
     public function comments()
     {
-        return $this->hasMany(Comment::class)->where('is_approved', true)->orderBy('created_at', 'desc');
+        return $this->morphMany(Comment::class, 'commentable')
+            ->whereNull('parent_id')
+            ->where('is_approved', true)
+            ->orderByDesc('created_at');
     }
 
     /**

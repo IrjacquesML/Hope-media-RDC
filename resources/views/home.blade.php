@@ -5,41 +5,41 @@
 
 @section('content')
     <!-- Héros plein écran -->
-    <section class="relative min-h-[88vh] flex items-center text-white overflow-hidden">
+    <section class="hero-section relative flex items-center text-white overflow-hidden">
         <div class="absolute inset-0" id="hero-carousel" aria-hidden="true">
             @foreach($heroSlides as $index => $slide)
                 <div class="hero-slide absolute inset-0 {{ $index === 0 ? 'opacity-100' : 'opacity-0' }} transition-opacity duration-[1600ms] ease-in-out">
-                    <div class="hero-bg absolute inset-0 bg-cover bg-center"
+                    <div class="hero-bg absolute inset-0"
                          style="background-image: url('{{ asset($slide->image) }}');"></div>
                 </div>
             @endforeach
 
-            <div class="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/45 to-slate-950/80"></div>
-            <div class="absolute inset-0 bg-gradient-to-r from-blue-950/50 via-transparent to-transparent"></div>
+            <div class="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/50 to-slate-950/85 pointer-events-none"></div>
+            <div class="absolute inset-0 bg-gradient-to-r from-blue-950/50 via-transparent to-transparent pointer-events-none"></div>
         </div>
 
-        <div class="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-28">
+        <div class="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 md:py-28">
             <div class="max-w-3xl mx-auto text-center">
-                <p class="hero-fade text-sm md:text-base tracking-[0.28em] uppercase text-amber-200/90 font-semibold mb-5">
+                <p class="hero-fade text-xs sm:text-sm md:text-base tracking-[0.28em] uppercase text-amber-200/90 font-semibold mb-4 sm:mb-5">
                     Hope Media RDC
                 </p>
 
-                <h1 class="hero-fade hero-delay-1 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] mb-6 drop-shadow-lg">
+                <h1 class="hero-fade hero-delay-1 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] mb-4 sm:mb-6 drop-shadow-lg">
                     La Parole qui éclaire
                 </h1>
 
-                <p class="hero-fade hero-delay-2 text-lg md:text-xl text-slate-100/90 max-w-2xl mx-auto mb-10 leading-relaxed">
+                <p class="hero-fade hero-delay-2 text-base sm:text-lg md:text-xl text-slate-100/90 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
                     Enseignements bibliques, témoignages et ressources spirituelles pour nourrir votre foi.
                 </p>
 
-                <div class="hero-fade hero-delay-3 flex flex-col sm:flex-row gap-4 justify-center">
+                <div class="hero-fade hero-delay-3 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
                     <a href="{{ route('posts.index') }}"
-                       class="inline-flex items-center justify-center gap-2 bg-white text-blue-700 px-8 py-3.5 rounded-lg font-semibold shadow-lg shadow-black/20 hover:bg-blue-50 transition duration-300 hover:-translate-y-0.5">
+                       class="inline-flex items-center justify-center gap-2 bg-white text-blue-700 px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg font-semibold shadow-lg shadow-black/20 hover:bg-blue-50 transition duration-300 hover:-translate-y-0.5 text-sm sm:text-base">
                         <i class="fas fa-play-circle"></i>
                         Découvrir les enseignements
                     </a>
                     <a href="{{ route('contact.prayer') }}"
-                       class="inline-flex items-center justify-center gap-2 border border-white/70 bg-white/10 backdrop-blur-sm text-white px-8 py-3.5 rounded-lg font-semibold hover:bg-white/20 transition duration-300 hover:-translate-y-0.5">
+                       class="inline-flex items-center justify-center gap-2 border border-white/70 bg-white/10 backdrop-blur-sm text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg font-semibold hover:bg-white/20 transition duration-300 hover:-translate-y-0.5 text-sm sm:text-base">
                         <i class="fas fa-hands-praying"></i>
                         Demande de prière
                     </a>
@@ -48,10 +48,10 @@
         </div>
 
         @if($heroSlides->count() > 1)
-            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2" id="hero-dots" aria-label="Diapositives du carrousel">
+            <div class="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2.5 sm:gap-2" id="hero-dots" aria-label="Diapositives du carrousel">
                 @foreach($heroSlides as $index => $slide)
                     <button type="button"
-                            class="hero-dot h-2.5 w-2.5 rounded-full {{ $index === 0 ? 'bg-white' : 'bg-white/40' }} transition-all duration-300"
+                            class="hero-dot h-2.5 w-2.5 sm:h-2.5 sm:w-2.5 min-h-[11px] min-w-[11px] rounded-full {{ $index === 0 ? 'bg-white' : 'bg-white/40' }} transition-all duration-300 touch-manipulation p-1 box-content"
                             data-index="{{ $index }}"
                             aria-label="Image {{ $index + 1 }}"></button>
                 @endforeach
@@ -60,6 +60,24 @@
     </section>
 
     <style>
+        .hero-section {
+            /* svh/dvh : s'adapte à la barre d'adresse mobile */
+            min-height: 70vh;
+            min-height: 70svh;
+        }
+        @media (min-width: 640px) {
+            .hero-section {
+                min-height: 80vh;
+                min-height: 80svh;
+            }
+        }
+        @media (min-width: 768px) {
+            .hero-section {
+                min-height: 88vh;
+                min-height: 88svh;
+            }
+        }
+
         @keyframes hero-zoom {
             from { transform: scale(1.05); }
             to { transform: scale(1.14); }
@@ -68,10 +86,43 @@
             from { opacity: 0; transform: translateY(18px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
         .hero-bg {
-            animation: hero-zoom 18s ease-in-out infinite alternate;
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
             will-change: transform;
         }
+
+        /* Desktop : zoom Ken Burns */
+        @media (min-width: 768px) {
+            .hero-bg {
+                inset: -2%;
+                width: 104%;
+                height: 104%;
+                animation: hero-zoom 18s ease-in-out infinite alternate;
+            }
+        }
+
+        /* Mobile : cadrage stable plein écran, sans zoom */
+        @media (max-width: 767px) {
+            .hero-bg {
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                animation: none;
+                transform: none;
+            }
+        }
+
+        /* Préférence réduction de mouvement */
+        @media (prefers-reduced-motion: reduce) {
+            .hero-bg {
+                animation: none !important;
+                transform: none !important;
+            }
+        }
+
         .hero-fade {
             opacity: 0;
             animation: hero-rise 0.9s ease-out forwards;
@@ -89,10 +140,13 @@
         document.addEventListener('DOMContentLoaded', function () {
             const slides = document.querySelectorAll('.hero-slide');
             const dots = document.querySelectorAll('.hero-dot');
+            const carousel = document.getElementById('hero-carousel');
             if (slides.length < 2) return;
 
             let current = 0;
             let timer;
+            let touchStartX = 0;
+            let touchEndX = 0;
 
             function show(index) {
                 slides.forEach((slide, i) => {
@@ -111,17 +165,37 @@
                 show((current + 1) % slides.length);
             }
 
+            function prev() {
+                show((current - 1 + slides.length) % slides.length);
+            }
+
             function start() {
+                clearInterval(timer);
                 timer = setInterval(next, 6500);
             }
 
             dots.forEach((dot) => {
                 dot.addEventListener('click', function () {
-                    clearInterval(timer);
                     show(Number(dot.dataset.index));
                     start();
                 });
             });
+
+            // Swipe tactile smartphones
+            if (carousel) {
+                carousel.addEventListener('touchstart', function (e) {
+                    touchStartX = e.changedTouches[0].screenX;
+                }, { passive: true });
+
+                carousel.addEventListener('touchend', function (e) {
+                    touchEndX = e.changedTouches[0].screenX;
+                    const delta = touchEndX - touchStartX;
+                    if (Math.abs(delta) < 40) return;
+                    if (delta < 0) next();
+                    else prev();
+                    start();
+                }, { passive: true });
+            }
 
             show(0);
             start();

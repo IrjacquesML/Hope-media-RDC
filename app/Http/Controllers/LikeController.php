@@ -2,72 +2,70 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\News;
 use App\Models\Post;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class LikeController extends Controller
 {
-    /**
-     * Liker ou disliker un post via AJAX
-     * 
-     * @param Post $post
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function toggleLike(Post $post, Request $request)
+    public function toggleLike(Post $post, Request $request): JsonResponse
     {
-        // Vérifier si l'utilisateur a déjà liké ce post
-        // Utiliser l'IP de l'utilisateur ou la session pour tracker les likes
-        $clientIp = $request->ip();
-        $sessionKey = "liked_posts_{$clientIp}";
-        
-        // Récupérer les posts likés de la session/cookie
-        $likedPosts = session($sessionKey, []);
-        
-        if (in_array($post->id, $likedPosts)) {
-            // Disliker - retirer le like
-            $post->decrement('likes');
-            $likedPosts = array_filter($likedPosts, function ($id) use ($post) {
-                return $id !== $post->id;
-            });
+        return $this->toggle($post, $request, 'liked_posts');
+    }
+
+    public function checkLike(Post $post, Request $request): JsonResponse
+    {
+        return $this->check($post, $request, 'liked_posts');
+    }
+
+    public function toggleNewsLike(News $news, Request $request): JsonResponse
+    {
+        return $this->toggle($news, $request, 'liked_news');
+    }
+
+    public function checkNewsLike(News $news, Request $request): JsonResponse
+    {
+        return $this->check($news, $request, 'liked_news');
+    }
+
+    private function toggle(Model $model, Request $request, string $sessionPrefix): JsonResponse
+    {
+        $sessionKey = $sessionPrefix . '_' . $request->ip();
+        $likedIds = session($sessionKey, []);
+
+        if (in_array($model->id, $likedIds, true)) {
+            $model->decrement('likes');
+            $likedIds = array_values(array_filter($likedIds, fn ($id) => (int) $id !== (int) $model->id));
             $isLiked = false;
             $message = 'Like retiré';
         } else {
-            // Liker - ajouter le like
-            $post->increment('likes');
-            $likedPosts[] = $post->id;
+            $model->increment('likes');
+            $likedIds[] = $model->id;
             $isLiked = true;
-            $message = 'Publication aimée!';
+            $message = 'Publication aimée !';
         }
-        
-        // Sauvegarder l'état des likes dans la session
-        session([$sessionKey => $likedPosts]);
-        
+
+        session([$sessionKey => $likedIds]);
+        $model->refresh();
+
         return response()->json([
             'success' => true,
-            'likes' => $post->likes,
+            'likes'   => (int) $model->likes,
             'isLiked' => $isLiked,
             'message' => $message,
         ]);
     }
 
-    /**
-     * Vérifier si l'utilisateur a liké un post
-     * 
-     * @param Post $post
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function checkLike(Post $post, Request $request)
+    private function check(Model $model, Request $request, string $sessionPrefix): JsonResponse
     {
-        $clientIp = $request->ip();
-        $sessionKey = "liked_posts_{$clientIp}";
-        $likedPosts = session($sessionKey, []);
-        $isLiked = in_array($post->id, $likedPosts);
+        $sessionKey = $sessionPrefix . '_' . $request->ip();
+        $likedIds = session($sessionKey, []);
 
         return response()->json([
-            'isLiked' => $isLiked,
-            'likes' => $post->likes,
+            'isLiked' => in_array($model->id, $likedIds, true),
+            'likes'   => (int) $model->likes,
         ]);
     }
 }

@@ -43,6 +43,7 @@ class PostController extends Controller
         
         // Incrémenter le compteur de vues
         $post->incrementViews();
+        $post->load(['comments.replies']);
 
         // Récupérer les posts associés (même catégorie)
         $relatedPosts = $post->category

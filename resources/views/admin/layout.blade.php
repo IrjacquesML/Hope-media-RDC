@@ -57,6 +57,11 @@
                     <i class="fas fa-envelope"></i>
                     <span>Messages</span>
                 </a>
+
+                <a href="{{ route('admin.comments.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.comments*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
+                    <i class="fas fa-comments"></i>
+                    <span>Commentaires</span>
+                </a>
                 
                 <a href="{{ route('admin.news.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.news*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
                     <i class="fas fa-newspaper"></i>

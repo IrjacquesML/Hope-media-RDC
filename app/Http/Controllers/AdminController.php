@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Post;
 use App\Models\Media;
 use App\Models\Contact;
+use App\Models\Comment;
 use App\Models\HeroSlide;
 use App\Models\News;
 use App\Models\NewsletterSubscription;
@@ -19,6 +20,7 @@ use App\Services\InstagramSyncService;
 use App\Services\TikTokSyncService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -611,6 +613,69 @@ class AdminController extends Controller
         $heroSlide->delete();
 
         return redirect()->route('admin.hero-slides.index')->with('success', 'Image du carrousel supprimée !');
+    }
+
+    // COMMENTAIRES (modération + réponses admin)
+    public function comments(Request $request)
+    {
+        $query = Comment::query()
+            ->root()
+            ->with(['commentable', 'replies'])
+            ->orderByDesc('created_at');
+
+        if ($search = $request->get('q')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('author_name', 'like', "%{$search}%")
+                  ->orWhere('content', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->get('sans_reponse') === '1') {
+            $query->whereDoesntHave('replies');
+        }
+
+        $comments = $query->paginate(20)->withQueryString();
+
+        $stats = [
+            'total' => Comment::root()->count(),
+            'unanswered' => Comment::root()->whereDoesntHave('replies')->count(),
+            'replies' => Comment::whereNotNull('parent_id')->count(),
+        ];
+
+        return view('admin.comments.index', compact('comments', 'stats'));
+    }
+
+    public function replyComment(Request $request, Comment $comment)
+    {
+        if ($comment->parent_id) {
+            return back()->with('error', 'Vous ne pouvez répondre qu\'à un commentaire principal.');
+        }
+
+        $validated = $request->validate([
+            'content' => 'required|string|max:2000',
+        ]);
+
+        $adminName = Auth::user()?->name ?: 'Hope Media RDC';
+
+        Comment::create([
+            'parent_id'        => $comment->id,
+            'commentable_type' => $comment->commentable_type,
+            'commentable_id'   => $comment->commentable_id,
+            'author_name'      => $adminName,
+            'author_email'     => Auth::user()?->email,
+            'content'          => $validated['content'],
+            'is_approved'      => true,
+            'is_admin_reply'   => true,
+        ]);
+
+        return back()->with('success', 'Réponse publiée avec succès !');
+    }
+
+    public function deleteComment(Comment $comment)
+    {
+        $comment->delete();
+
+        return redirect()->route('admin.comments.index')->with('success', 'Commentaire supprimé !');
     }
 
     // NEWSLETTER

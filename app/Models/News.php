@@ -20,6 +20,7 @@ class News extends Model
         'status',
         'published_at',
         'views',
+        'likes',
         'is_featured',
         'category',
         'tags',
@@ -31,6 +32,14 @@ class News extends Model
         'is_featured' => 'boolean',
         'tags' => 'array',
     ];
+
+    public function comments()
+    {
+        return $this->morphMany(Comment::class, 'commentable')
+            ->whereNull('parent_id')
+            ->where('is_approved', true)
+            ->orderByDesc('created_at');
+    }
 
     public static function categories(): array
     {

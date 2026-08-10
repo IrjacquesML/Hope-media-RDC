@@ -41,6 +41,7 @@ class NewsController extends Controller
 
         // Incrémenter les vues
         $article->increment('views');
+        $article->load(['comments.replies']);
 
         $recent = News::published()
             ->where('id', '!=', $article->id)

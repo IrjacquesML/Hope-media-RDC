@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Comment;
 use App\Models\Post;
 use Illuminate\Database\Seeder;
 
@@ -31,8 +30,7 @@ class CommentSeeder extends Seeder
             $selected = array_slice($commentPool, ($index * 2) % count($commentPool), $count);
 
             foreach ($selected as $i => $data) {
-                Comment::create([
-                    'post_id'      => $post->id,
+                $post->comments()->create([
                     'author_name'  => $data['author_name'],
                     'author_email' => null,
                     'content'      => $data['content'],

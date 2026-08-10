@@ -283,19 +283,38 @@
                     @if($post->comments->count() > 0)
                         <div class="space-y-6">
                             @foreach($post->comments as $comment)
-                                <div class="flex gap-4 border-b border-slate-100 pb-6 last:border-b-0 last:pb-0">
-                                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                                        <span class="text-blue-700 font-bold text-sm uppercase">
-                                            {{ mb_substr($comment->author_name, 0, 1) }}
-                                        </span>
-                                    </div>
-                                    <div class="flex-grow">
-                                        <div class="flex items-center gap-3 mb-1">
-                                            <span class="font-semibold text-slate-900 text-sm">{{ $comment->author_name }}</span>
-                                            <span class="text-xs text-slate-400">{{ $comment->created_at->diffForHumans() }}</span>
+                                <div class="border-b border-slate-100 pb-6 last:border-b-0 last:pb-0">
+                                    <div class="flex gap-4">
+                                        <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                            <span class="text-blue-700 font-bold text-sm uppercase">
+                                                {{ mb_substr($comment->author_name, 0, 1) }}
+                                            </span>
                                         </div>
-                                        <p class="text-slate-700 text-sm leading-relaxed">{{ $comment->content }}</p>
+                                        <div class="flex-grow min-w-0">
+                                            <div class="flex items-center gap-3 mb-1">
+                                                <span class="font-semibold text-slate-900 text-sm">{{ $comment->author_name }}</span>
+                                                <span class="text-xs text-slate-400">{{ $comment->created_at->diffForHumans() }}</span>
+                                            </div>
+                                            <p class="text-slate-700 text-sm leading-relaxed whitespace-pre-line">{{ $comment->content }}</p>
+                                        </div>
                                     </div>
+
+                                    @if($comment->replies->isNotEmpty())
+                                        <div class="mt-4 ml-2 sm:ml-14 space-y-3 border-l-2 border-blue-200 pl-4">
+                                            @foreach($comment->replies as $reply)
+                                                <div class="bg-blue-50 rounded-lg p-3">
+                                                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                                                        <span class="text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                                                            <i class="fas fa-shield-alt mr-1"></i>Hope Media RDC
+                                                        </span>
+                                                        <span class="font-semibold text-slate-900 text-sm">{{ $reply->author_name }}</span>
+                                                        <span class="text-xs text-slate-400">{{ $reply->created_at->diffForHumans() }}</span>
+                                                    </div>
+                                                    <p class="text-slate-700 text-sm leading-relaxed whitespace-pre-line">{{ $reply->content }}</p>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -324,7 +343,7 @@
                         <div class="flex justify-between items-center">
                             <button id="like-btn-{{ $post->id }}" type="button" class="flex-1 flex justify-between items-center like-btn text-left text-slate-600 hover:text-red-600 transition py-2 px-3 rounded-lg hover:bg-red-50" data-post-id="{{ $post->id }}">
                                 <span>
-                                    <i class="fas fa-heart mr-2"></i>
+                                    <i class="far fa-heart mr-2"></i>
                                     Aimer cette publication
                                 </span>
                                 <span class="font-bold text-red-600 like-count">{{ $post->likes }}</span>
