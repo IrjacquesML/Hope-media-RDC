@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HeroSlide;
 use App\Models\News;
 use App\Models\Post;
 use App\Models\Video;
@@ -63,10 +64,21 @@ class HomeController extends Controller
             'tiktok'    => Video::where('platform', 'tiktok')->orderByDesc('published_at')->limit(8)->get(),
         ];
 
+        $heroSlides = HeroSlide::active()->ordered()->get();
+
+        if ($heroSlides->isEmpty()) {
+            $heroSlides = collect([
+                (object) ['image' => 'images/hero-sunrise.jpg'],
+                (object) ['image' => 'images/hero-bible.jpg'],
+                (object) ['image' => 'images/hero-hope.jpg'],
+            ]);
+        }
+
         return view('home', [
             'latestPublications' => $latestPublications,
             'latestVideos'       => $latestVideos,
             'videosByPlatform'   => $videosByPlatform,
+            'heroSlides'         => $heroSlides,
         ]);
     }
 }

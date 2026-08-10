@@ -7,18 +7,12 @@
     <!-- Héros plein écran -->
     <section class="relative min-h-[88vh] flex items-center text-white overflow-hidden">
         <div class="absolute inset-0" id="hero-carousel" aria-hidden="true">
-            <div class="hero-slide absolute inset-0 opacity-100 transition-opacity duration-[1600ms] ease-in-out">
-                <div class="hero-bg absolute inset-0 bg-cover bg-center"
-                     style="background-image: url('/images/hero-sunrise.jpg');"></div>
-            </div>
-            <div class="hero-slide absolute inset-0 opacity-0 transition-opacity duration-[1600ms] ease-in-out">
-                <div class="hero-bg absolute inset-0 bg-cover bg-center"
-                     style="background-image: url('/images/hero-bible.jpg');"></div>
-            </div>
-            <div class="hero-slide absolute inset-0 opacity-0 transition-opacity duration-[1600ms] ease-in-out">
-                <div class="hero-bg absolute inset-0 bg-cover bg-center"
-                     style="background-image: url('/images/hero-hope.jpg');"></div>
-            </div>
+            @foreach($heroSlides as $index => $slide)
+                <div class="hero-slide absolute inset-0 {{ $index === 0 ? 'opacity-100' : 'opacity-0' }} transition-opacity duration-[1600ms] ease-in-out">
+                    <div class="hero-bg absolute inset-0 bg-cover bg-center"
+                         style="background-image: url('{{ asset($slide->image) }}');"></div>
+                </div>
+            @endforeach
 
             <div class="absolute inset-0 bg-gradient-to-b from-slate-950/70 via-slate-950/45 to-slate-950/80"></div>
             <div class="absolute inset-0 bg-gradient-to-r from-blue-950/50 via-transparent to-transparent"></div>
@@ -53,11 +47,16 @@
             </div>
         </div>
 
-        <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2" id="hero-dots" aria-label="Diapositives du carrousel">
-            <button type="button" class="hero-dot h-2.5 w-2.5 rounded-full bg-white transition-all duration-300" data-index="0" aria-label="Image 1"></button>
-            <button type="button" class="hero-dot h-2.5 w-2.5 rounded-full bg-white/40 transition-all duration-300" data-index="1" aria-label="Image 2"></button>
-            <button type="button" class="hero-dot h-2.5 w-2.5 rounded-full bg-white/40 transition-all duration-300" data-index="2" aria-label="Image 3"></button>
-        </div>
+        @if($heroSlides->count() > 1)
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2" id="hero-dots" aria-label="Diapositives du carrousel">
+                @foreach($heroSlides as $index => $slide)
+                    <button type="button"
+                            class="hero-dot h-2.5 w-2.5 rounded-full {{ $index === 0 ? 'bg-white' : 'bg-white/40' }} transition-all duration-300"
+                            data-index="{{ $index }}"
+                            aria-label="Image {{ $index + 1 }}"></button>
+                @endforeach
+            </div>
+        @endif
     </section>
 
     <style>
@@ -90,6 +89,8 @@
         document.addEventListener('DOMContentLoaded', function () {
             const slides = document.querySelectorAll('.hero-slide');
             const dots = document.querySelectorAll('.hero-dot');
+            if (slides.length < 2) return;
+
             let current = 0;
             let timer;
 

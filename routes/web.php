@@ -152,6 +152,16 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::delete('/{news}', [AdminController::class, 'deleteNews'])->name('delete');
     });
 
+    // Carrousel page d'accueil
+    Route::prefix('carousel')->name('hero-slides.')->group(function () {
+        Route::get('/', [AdminController::class, 'heroSlides'])->name('index');
+        Route::get('/create', [AdminController::class, 'createHeroSlide'])->name('create');
+        Route::post('/', [AdminController::class, 'storeHeroSlide'])->name('store');
+        Route::get('/{heroSlide}/edit', [AdminController::class, 'editHeroSlide'])->name('edit');
+        Route::put('/{heroSlide}', [AdminController::class, 'updateHeroSlide'])->name('update');
+        Route::delete('/{heroSlide}', [AdminController::class, 'deleteHeroSlide'])->name('delete');
+    });
+
     // Newsletter
     Route::prefix('newsletter')->name('newsletter.')->group(function () {
         Route::get('/', [AdminController::class, 'newsletter'])->name('index');

@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Post;
 use App\Models\Media;
 use App\Models\Contact;
+use App\Models\HeroSlide;
 use App\Models\News;
 use App\Models\NewsletterSubscription;
 use App\Models\Resource;
@@ -528,6 +529,88 @@ class AdminController extends Controller
         }
         $news->delete();
         return redirect()->route('admin.news.index')->with('success', 'Article supprimé!');
+    }
+
+    // CAROUSEL ACCUEIL (Hero slides)
+    public function heroSlides()
+    {
+        $slides = HeroSlide::ordered()->paginate(20);
+        $stats = [
+            'total'  => HeroSlide::count(),
+            'active' => HeroSlide::where('is_active', true)->count(),
+        ];
+
+        return view('admin.hero-slides.index', compact('slides', 'stats'));
+    }
+
+    public function createHeroSlide()
+    {
+        return view('admin.hero-slides.create');
+    }
+
+    public function storeHeroSlide(Request $request)
+    {
+        $validated = $request->validate([
+            'image'      => 'required|image|mimes:jpeg,png,webp|max:5120',
+            'title'      => 'nullable|string|max:255',
+            'sort_order' => 'nullable|integer|min:0|max:999',
+            'is_active'  => 'nullable|boolean',
+        ]);
+
+        $this->ensureDirectory(public_path('images/hero'));
+        $file = $request->file('image');
+        $filename = time() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '_', $file->getClientOriginalName());
+        $file->move(public_path('images/hero'), $filename);
+        $validated['image'] = 'images/hero/' . $filename;
+        $validated['sort_order'] = (int) ($validated['sort_order'] ?? 0);
+        $validated['is_active'] = $request->boolean('is_active', true);
+
+        HeroSlide::create($validated);
+
+        return redirect()->route('admin.hero-slides.index')->with('success', 'Image ajoutée au carrousel !');
+    }
+
+    public function editHeroSlide(HeroSlide $heroSlide)
+    {
+        return view('admin.hero-slides.edit', compact('heroSlide'));
+    }
+
+    public function updateHeroSlide(Request $request, HeroSlide $heroSlide)
+    {
+        $validated = $request->validate([
+            'image'      => 'nullable|image|mimes:jpeg,png,webp|max:5120',
+            'title'      => 'nullable|string|max:255',
+            'sort_order' => 'nullable|integer|min:0|max:999',
+            'is_active'  => 'nullable|boolean',
+        ]);
+
+        if ($request->hasFile('image')) {
+            if ($heroSlide->image && file_exists(public_path($heroSlide->image))) {
+                @unlink(public_path($heroSlide->image));
+            }
+            $this->ensureDirectory(public_path('images/hero'));
+            $file = $request->file('image');
+            $filename = time() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '_', $file->getClientOriginalName());
+            $file->move(public_path('images/hero'), $filename);
+            $validated['image'] = 'images/hero/' . $filename;
+        }
+
+        $validated['sort_order'] = (int) ($validated['sort_order'] ?? 0);
+        $validated['is_active'] = $request->boolean('is_active');
+
+        $heroSlide->update($validated);
+
+        return redirect()->route('admin.hero-slides.index')->with('success', 'Image du carrousel mise à jour !');
+    }
+
+    public function deleteHeroSlide(HeroSlide $heroSlide)
+    {
+        if ($heroSlide->image && file_exists(public_path($heroSlide->image))) {
+            @unlink(public_path($heroSlide->image));
+        }
+        $heroSlide->delete();
+
+        return redirect()->route('admin.hero-slides.index')->with('success', 'Image du carrousel supprimée !');
     }
 
     // NEWSLETTER

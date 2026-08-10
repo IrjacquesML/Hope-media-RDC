@@ -32,6 +32,11 @@
                     <i class="fas fa-file-alt"></i>
                     <span>Posts</span>
                 </a>
+
+                <a href="{{ route('admin.hero-slides.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.hero-slides*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
+                    <i class="fas fa-images"></i>
+                    <span>Carrousel Accueil</span>
+                </a>
                 
                 <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.categories*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
                     <i class="fas fa-folder"></i>
