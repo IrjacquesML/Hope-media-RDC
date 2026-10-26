@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Services\FacebookSyncService;
 use App\Services\InstagramSyncService;
+use App\Services\SocialSyncManager;
 use App\Services\TikTokSyncService;
 use App\Services\YouTubeApiService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Facades\DB;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -57,5 +59,16 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useTailwind();
+
+        // En production (APP_ENV=production), interdit les commandes qui vident la base :
+        // migrate:fresh, migrate:refresh, migrate:reset et db:wipe refusent de s'exécuter.
+        DB::prohibitDestructiveCommands($this->app->isProduction());
+
+        // Identifiants des réseaux saisis dans l'admin : ils remplacent ceux du .env.
+        try {
+            $this->app->make(SocialSyncManager::class)->applyToConfig();
+        } catch (\Throwable) {
+            // Base indisponible (installation, migration en cours) : on garde le .env.
+        }
     }
 }

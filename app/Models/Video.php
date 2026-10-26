@@ -54,7 +54,7 @@ class Video extends Model
     protected function embedUrl(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->platform->embedUrl($this->video_id),
+            get: fn () => $this->facebookEmbedUrl(false) ?? $this->platform->embedUrl($this->video_id),
         );
     }
 
@@ -65,7 +65,7 @@ class Video extends Model
     protected function embedUrlAutoplay(): Attribute
     {
         return Attribute::make(
-            get: fn () => $this->platform->embedUrl($this->video_id, autoplay: true),
+            get: fn () => $this->facebookEmbedUrl(true) ?? $this->platform->embedUrl($this->video_id, autoplay: true),
         );
     }
 
@@ -89,5 +89,18 @@ class Video extends Model
         return Attribute::make(
             get: fn () => $this->platform->isVertical(),
         );
+    }
+    /**
+     * Lecteur Facebook construit sur le vrai lien de la vidéo (enregistré par la synchronisation).
+     * null pour les autres plateformes ou si le lien est absent.
+     */
+    private function facebookEmbedUrl(bool $autoplay): ?string
+    {
+        if ($this->platform !== VideoPlatform::Facebook || empty($this->post_url)) {
+            return null;
+        }
+
+        return 'https://www.facebook.com/plugins/video.php?href=' . rawurlencode($this->post_url)
+            . '&show_text=false' . ($autoplay ? '&autoplay=true' : '');
     }
 }

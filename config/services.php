@@ -87,4 +87,19 @@ return [
         'max_results'   => (int) env('TIKTOK_MAX_RESULTS', 20),
     ],
 
+    // -------------------------------------------------------------------------
+    // X (ex-Twitter) API v2
+    // X_BEARER_TOKEN : Bearer Token de l'app (developer.x.com → Projects & Apps → Keys and tokens)
+    // X_USERNAME     : nom du compte sans @ (ex: HopeMediaRDC)
+    // La lecture des publications d'un compte nécessite l'offre « Basic » ou supérieure.
+    // -------------------------------------------------------------------------
+    'x' => [
+        'bearer_token' => env('X_BEARER_TOKEN'),
+        'username'     => env('X_USERNAME'),
+        'max_results'  => (int) env('X_MAX_RESULTS', 20),
+    ],
+
+    // Les valeurs ci-dessus servent de repli : celles saisies dans l'admin
+    // (Admin → Réseaux sociaux) sont prioritaires.
+
 ];

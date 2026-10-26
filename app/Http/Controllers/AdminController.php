@@ -316,23 +316,18 @@ class AdminController extends Controller
 
     public function syncVideos(string $platform)
     {
-        $allowed = ['youtube', 'facebook', 'instagram', 'tiktok'];
-        if (! in_array($platform, $allowed, true)) {
+        if (! in_array($platform, \App\Support\SocialPlatforms::keys(), true)) {
             return back()->with('error', 'Plateforme inconnue.');
         }
+        $label = \App\Support\SocialPlatforms::get($platform)['label'];
 
         try {
-            $count = match ($platform) {
-                'youtube' => app(YouTubeApiService::class)->syncLatestVideos(),
-                'facebook' => app(FacebookSyncService::class)->syncLatestPosts(),
-                'instagram' => app(InstagramSyncService::class)->syncLatestMedia(),
-                'tiktok' => app(TikTokSyncService::class)->syncLatestVideos(),
-            };
+            // Identifiants saisis dans Admin → Réseaux sociaux (repli .env) ; le résultat y est enregistré.
+            $count = app(\App\Services\SocialSyncManager::class)->sync($platform);
 
-            return back()->with('success', ucfirst($platform) . " : {$count} contenu(s) synchronisé(s).");
+            return back()->with('success', "{$label} : {$count} vidéo(s) synchronisée(s).");
         } catch (\Throwable $e) {
-            Log::error("Admin sync {$platform} failed", ['error' => $e->getMessage()]);
-            return back()->with('error', 'Échec de la synchronisation ' . $platform . ' : ' . $e->getMessage());
+            return back()->with('error', "Échec de la synchronisation {$label} : " . $e->getMessage());
         }
     }
 

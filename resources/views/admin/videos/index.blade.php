@@ -4,8 +4,8 @@
 @section('page_title', 'Contenus réseaux sociaux')
 
 @section('content')
-    <div class="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-        @foreach(['youtube' => 'YouTube', 'facebook' => 'Facebook', 'instagram' => 'Instagram', 'tiktok' => 'TikTok'] as $key => $label)
+    <div class="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        @foreach(['youtube' => 'YouTube', 'facebook' => 'Facebook', 'instagram' => 'Instagram', 'tiktok' => 'TikTok', 'x' => 'X'] as $key => $label)
             <div class="bg-white rounded-lg shadow p-5 flex flex-col gap-3">
                 <div class="flex items-center justify-between">
                     <h3 class="font-bold text-slate-900">{{ $label }}</h3>
@@ -26,7 +26,7 @@
            class="px-3 py-1.5 rounded-full text-sm font-semibold {{ !request('platform') ? 'bg-slate-800 text-white' : 'bg-white border text-slate-600' }}">
             Tout
         </a>
-        @foreach(['youtube','facebook','instagram','tiktok'] as $p)
+        @foreach(['youtube','facebook','instagram','tiktok','x'] as $p)
             <a href="{{ route('admin.videos.index', ['platform' => $p]) }}"
                class="px-3 py-1.5 rounded-full text-sm font-semibold {{ request('platform') === $p ? 'bg-blue-600 text-white' : 'bg-white border text-slate-600' }}">
                 {{ ucfirst($p) }}

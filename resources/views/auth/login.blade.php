@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion Admin - Hope Media RDC</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
 <body class="bg-gradient-to-br from-blue-600 to-blue-800 min-h-screen flex items-center justify-center p-4">
     <div class="w-full max-w-md">
@@ -13,9 +13,9 @@
         <div class="bg-white rounded-lg shadow-2xl p-8">
             <!-- En-tête -->
             <div class="text-center mb-8">
-                <div class="flex justify-center mb-4">
-                    <i class="fas fa-shield-alt text-blue-600 text-4xl"></i>
-                </div>
+                <a href="{{ route('home') }}" class="flex justify-center mb-4" aria-label="Hope Media RDC — Accueil">
+                    <img src="{{ asset('images/brand/logo-hope-media.webp') }}" alt="Hope Media Network-DRC" width="360" height="314" class="h-24 w-auto">
+                </a>
                 <h1 class="text-3xl font-bold text-slate-900 mb-2">Admin Login</h1>
                 <p class="text-slate-600">Hope Media RDC - Panneau d'Administration</p>
             </div>

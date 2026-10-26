@@ -8,6 +8,7 @@ enum VideoPlatform: string
     case TikTok    = 'tiktok';
     case Facebook  = 'facebook';
     case Instagram = 'instagram';
+    case X         = 'x';
 
     /**
      * Retourne le libellé lisible pour l'affichage.
@@ -19,6 +20,7 @@ enum VideoPlatform: string
             self::TikTok    => 'TikTok',
             self::Facebook  => 'Facebook',
             self::Instagram => 'Instagram',
+            self::X         => 'X',
         };
     }
 
@@ -39,6 +41,7 @@ enum VideoPlatform: string
                 . rawurlencode('https://www.facebook.com/facebook/videos/' . $videoId . '/')
                 . '&show_text=false' . ($autoplay ? '&autoplay=true' : ''),
             self::Instagram => 'https://www.instagram.com/p/' . $videoId . '/embed/',
+            self::X         => 'https://platform.twitter.com/embed/Tweet.html?dnt=true&theme=dark&id=' . $videoId,
         };
     }
 

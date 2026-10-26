@@ -1,212 +1,218 @@
+@php
+    // Les sections courtes (@section('x', '...')) sont déjà échappées par Blade : on les décode avant de les réafficher.
+    $section = fn (string $name) => html_entity_decode(trim($__env->yieldContent($name)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $pageTitle = $section('title');
+    $metaDescription = $section('meta_description') ?: "Hope Media RDC : vidéos, enseignements et actualités de la mission, en continu sur YouTube, Facebook, Instagram et TikTok.";
+    $ogImage = $section('og_image') ?: asset('images/hero-bible.jpg');
+    $youtubeChannel = 'https://www.youtube.com/@Hopemedia-u4b';
+    // Menu principal : uniquement les contenus (comme une chaîne). « À propos » et « Contact » sont dans le tiroir et le pied de page.
+    $nav = [
+        ['home', 'home', 'Accueil', 'fa-house'],
+        ['videos.index', 'videos.*', 'Vidéos', 'fa-circle-play'],
+        ['posts.index', 'posts.*', 'Enseignements', 'fa-book-open'],
+        ['news.index', 'news.*', 'Écho de la mission', 'fa-newspaper'],
+        ['ressources.index', 'ressources.*', 'Ressources', 'fa-book'],
+    ];
+    $navMore = [
+        ['about', 'about', 'La chaîne', 'fa-tv'],
+        ['contact.create', 'contact.create', 'Écrire à la rédaction', 'fa-paper-plane'],
+    ];
+@endphp
 <!DOCTYPE html>
 <html lang="fr">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title') - Hope Media RDC</title>
-    <meta name="description" content="@yield('meta_description', 'Hope Media RDC - Plateforme officielle de l\'Église Adventiste du 7ème Jour (Union du Congo Ouest)')">
-    <meta name="keywords" content="@yield('meta_keywords', 'enseignements bibliques, église adventiste, prières, vidéos religieuses')">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>{{ $pageTitle ? $pageTitle . ' - ' : '' }}Hope Media RDC</title>
+    <meta name="description" content="{{ $metaDescription }}">
+    <meta name="keywords" content="{{ $section('meta_keywords') ?: 'enseignements bibliques, église adventiste, prières, vidéos religieuses' }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="theme-color" content="#0B1530">
+    <link rel="canonical" href="{{ url()->current() }}">
 
-    <!-- Font Awesome pour les icônes -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    {{-- Partage WhatsApp / Facebook --}}
+    <meta property="og:type" content="@yield('og_type', 'website')">
+    <meta property="og:site_name" content="Hope Media RDC">
+    <meta property="og:title" content="{{ $pageTitle ?: 'Hope Media RDC — La Parole qui éclaire' }}">
+    <meta property="og:description" content="{{ $metaDescription }}">
+    <meta property="og:image" content="{{ $ogImage }}">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:locale" content="fr_CD">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ $pageTitle ?: 'Hope Media RDC — La Parole qui éclaire' }}">
+    <meta name="twitter:description" content="{{ $metaDescription }}">
+    <meta name="twitter:image" content="{{ $ogImage }}">
 
-    <!-- Vite Assets (Tailwind CSS + JS) -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@700;800&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <script>try { if (localStorage.getItem('hm:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}</script>
+
+    @vite(['resources/css/site.css', 'resources/js/site.js'])
+    @stack('head')
 </head>
 
-<body class="bg-slate-50 text-slate-900">
-    <!-- Navigation -->
-    <nav class="sticky top-0 z-50 bg-white shadow-md">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <!-- Logo -->
-                <div class="flex-shrink-0 flex items-center">
-                    <a href="{{ route('home') }}" class="font-bold text-2xl text-blue-600 flex items-center gap-2 hover:opacity-80 transition">
-                        <img src="{{ asset('images/logo (2).png') }}" alt="Hope Media RDC" class="h-16 w-auto">
-                    </a>
-                </div>
+<body>
+    <a class="skip" href="#contenu">Aller au contenu</a>
 
-                <!-- Menu principal (Desktop) -->
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="{{ route('home') }}" class="hover:text-blue-600 transition font-semibold {{ request()->routeIs('home') ? 'text-blue-600' : '' }}">
-                        Accueil
-                    </a>
-                    <a href="{{ route('posts.index') }}" class="hover:text-blue-600 transition {{ request()->routeIs('posts.*') ? 'text-blue-600 font-semibold' : '' }}">
-                        <i class="fas fa-book-open mr-1"></i>Enseignements
-                    </a>
-                    <a href="{{ route('news.index') }}" class="hover:text-blue-600 transition {{ request()->routeIs('news.*') ? 'text-blue-600 font-semibold' : '' }}">
-                        Écho de la mission
-                    </a>
-                    <a href="{{ route('ressources.index') }}" class="hover:text-blue-600 transition {{ request()->routeIs('ressources.*') ? 'text-blue-600 font-semibold' : '' }}">
-                        <i class="fas fa-book-open mr-1"></i>Ressources
-                    </a>
-                    <a href="{{ route('about') }}" class="hover:text-blue-600 transition {{ request()->routeIs('about') ? 'text-blue-600 font-semibold' : '' }}">
-                        À propos
-                    </a>
-                    <a href="{{ route('contact.create') }}" class="hover:text-blue-600 transition">
-                        Contact
-                    </a>
-                </div>
-
-                <!-- Bouton Direct/Live et Mobile Menu -->
-                <div class="flex items-center gap-4">
-                    @if(Auth::check())
-                    <a href="{{ route('admin.dashboard') }}" class="hidden md:block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
-                        <i class="fas fa-th-large mr-2"></i> Dashboard
-                    </a>
-                    <form action="{{ route('auth.logout') }}" method="POST" class="hidden md:block">
-                        @csrf
-                        <button type="submit" class="text-slate-600 hover:text-red-600 transition">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
-                    </form>
-                    @endif
-                    <a href="{{ route('contact.prayer') }}" class="hidden md:block bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-semibold">
-                        <i class="fas fa-pray mr-2"></i> Direct/Prière
-                    </a>
-
-                    <!-- Menu Mobile Toggle -->
-                    <button id="mobile-menu-btn" class="md:hidden text-slate-600 hover:text-blue-600">
-                        <i class="fas fa-bars text-2xl"></i>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Menu Mobile -->
-            <div id="mobile-menu" class="hidden md:hidden pb-4 space-y-2 border-t">
-                <a href="{{ route('home') }}" class="block px-4 py-2 hover:bg-red-50 rounded font-semibold">
-                    Accueil
+    {{-- En-tête --}}
+    <header class="header @yield('header_class')" id="header">
+        <div class="wrap">
+            <a class="logo" href="{{ route('home') }}" aria-label="Hope Media RDC — Accueil">
+                <img class="l-dark" src="{{ asset('images/brand/logo-hope-media-negatif.webp') }}" alt="Hope Media Network-DRC" width="360" height="314">
+                <img class="l-light" src="{{ asset('images/brand/logo-hope-media.webp') }}" alt="" width="360" height="314">
+            </a>
+            <nav class="nav" aria-label="Navigation principale">
+                @foreach ($nav as [$route, $pattern, $label])
+                    <a href="{{ route($route) }}" @if (request()->routeIs($pattern)) aria-current="page" @endif>{{ $label }}</a>
+                @endforeach
+            </nav>
+            <div class="h-actions">
+                <span class="clock" aria-hidden="true">Kinshasa <b id="clock">--:--</b></span>
+                <a class="live-badge" href="{{ $youtubeChannel }}/live" target="_blank" rel="noopener" aria-label="Direct sur YouTube (nouvel onglet)">
+                    <span class="dot" aria-hidden="true"></span>Direct
                 </a>
-                <a href="{{ route('posts.index') }}" class="block px-4 py-2 hover:bg-blue-50 rounded">
-                    <i class="fas fa-book-open mr-1"></i>Enseignements
-                </a>
-                <a href="{{ route('news.index') }}" class="block px-4 py-2 hover:bg-blue-50 rounded">Écho de la mission</a>
-                <a href="{{ route('ressources.index') }}" class="block px-4 py-2 hover:bg-blue-50 rounded"><i class="fas fa-book-open mr-1"></i>Ressources</a>
-                <a href="{{ route('about') }}" class="block px-4 py-2 hover:bg-blue-50 rounded">À propos</a>
-                <a href="{{ route('contact.create') }}" class="block px-4 py-2 hover:bg-blue-50 rounded">Contact</a>
-                @if(Auth::check())
-                <a href="{{ route('admin.dashboard') }}" class="block px-4 py-2 bg-blue-50 hover:bg-blue-100 rounded font-semibold">
-                    <i class="fas fa-th-large mr-2"></i> Dashboard Admin
-                </a>
-                <form action="{{ route('auth.logout') }}" method="POST">
-                    @csrf
-                    <button type="submit" class="w-full text-left block px-4 py-2 text-red-600 hover:bg-red-50 rounded">
-                        <i class="fas fa-sign-out-alt mr-2"></i> Déconnexion
-                    </button>
-                </form>
-                @endif
-                <a href="{{ route('contact.prayer') }}" class="block px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Prière</a>
+                <a class="btn btn-gold h-pray" href="{{ route('contact.prayer') }}"><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Prière</a>
+                @auth
+                    <a class="icon-btn h-admin" href="{{ route('admin.dashboard') }}" aria-label="Tableau de bord admin"><i class="fa-solid fa-gauge" aria-hidden="true"></i></a>
+                @endauth
+                <button class="icon-btn" type="button" data-search-open aria-label="Rechercher un enseignement"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
+                <button class="icon-btn" type="button" id="themeToggle" aria-label="Passer en mode clair"><i class="fa-solid fa-sun" aria-hidden="true"></i></button>
+                <button class="icon-btn menu-btn" type="button" id="menuOpen" aria-label="Ouvrir le menu" aria-controls="drawer"><i class="fa-solid fa-bars" aria-hidden="true"></i></button>
             </div>
         </div>
-    </nav>
+    </header>
 
-    <!-- Messages Flash -->
-    @if ($message = Session::get('success'))
-    <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-        <i class="fas fa-check-circle mr-2"></i>
-        {{ $message }}
+    {{-- Menu complet (mobile et tablette) --}}
+    <div class="drawer" id="drawer" hidden>
+        <nav class="drawer-panel" aria-label="Menu">
+            <div class="drawer-head">
+                <strong>Menu</strong>
+                <button class="icon-btn" type="button" id="menuClose" aria-label="Fermer le menu"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </div>
+            @foreach ($nav as [$route, $pattern, $label, $icon])
+                <a href="{{ route($route) }}" @if (request()->routeIs($pattern)) aria-current="page" @endif><i class="fa-solid {{ $icon }}" aria-hidden="true"></i>{{ $label }}</a>
+            @endforeach
+            <a href="{{ $youtubeChannel }}/live" target="_blank" rel="noopener"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>Direct sur YouTube</a>
+            <a href="{{ route('contact.prayer') }}" @if (request()->routeIs('contact.prayer')) aria-current="page" @endif><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Ligne de prière</a>
+            <hr>
+            @foreach ($navMore as [$route, $pattern, $label, $icon])
+                <a href="{{ route($route) }}" @if (request()->routeIs($pattern)) aria-current="page" @endif><i class="fa-solid {{ $icon }}" aria-hidden="true"></i>{{ $label }}</a>
+            @endforeach
+            @auth
+                <hr>
+                <a href="{{ route('admin.dashboard') }}"><i class="fa-solid fa-gauge" aria-hidden="true"></i>Tableau de bord</a>
+                <form action="{{ route('auth.logout') }}" method="POST">
+                    @csrf
+                    <button type="submit" class="link"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>Déconnexion</button>
+                </form>
+            @endauth
+        </nav>
     </div>
+
+    {{-- Recherche (enseignements) --}}
+    <div class="search" id="search" role="dialog" aria-modal="true" aria-label="Recherche" hidden>
+        <div class="wrap">
+            <form class="search-box" action="{{ route('posts.search') }}" method="GET" role="search">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <label class="sr-only" for="searchInput">Rechercher un enseignement</label>
+                <input id="searchInput" name="q" type="search" placeholder="Rechercher un enseignement…" autocomplete="off" required minlength="3">
+                <button class="icon-btn" type="button" id="searchClose" aria-label="Fermer la recherche"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+            </form>
+            <p class="search-hint">Au moins 3 caractères, puis Entrée.</p>
+        </div>
+    </div>
+
+    {{-- Messages flash --}}
+    @if (session('success') || session('error'))
+        <div class="flash-zone" id="flash" role="status">
+            @if ($message = session('success'))
+                <div class="alert ok"><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>{{ $message }}</span></div>
+            @endif
+            @if ($message = session('error'))
+                <div class="alert err"><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>{{ $message }}</span></div>
+            @endif
+        </div>
     @endif
 
-    @if ($message = Session::get('error'))
-    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-        <i class="fas fa-exclamation-circle mr-2"></i>
-        {{ $message }}
-    </div>
-    @endif
-
-    <!-- Contenu principal -->
-    <main class="min-h-screen">
+    <main id="contenu">
         @yield('content')
+
+        {{-- Newsletter (toutes les pages) --}}
+        <section class="wrap" id="newsletter" aria-labelledby="nlTitle">
+            <div class="news-box">
+                <div>
+                    <h2 id="nlTitle">Ne manquez aucune sortie</h2>
+                    <p>Les nouvelles vidéos, les enseignements et l'Écho de la mission, chaque semaine dans votre boîte mail.</p>
+                </div>
+                <form class="nl-form" action="{{ route('newsletter.subscribe') }}" method="POST">
+                    @csrf
+                    <div class="nl-row">
+                        <label class="sr-only" for="nlName">Votre prénom (optionnel)</label>
+                        <input id="nlName" type="text" name="name" placeholder="Votre prénom (optionnel)" autocomplete="given-name">
+                        <label class="sr-only" for="nlEmail">Votre adresse e-mail</label>
+                        <input id="nlEmail" type="email" name="email" required placeholder="Votre adresse e-mail" autocomplete="email">
+                        <button class="btn btn-gold" type="submit"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i>S'abonner</button>
+                    </div>
+                    @if (session('newsletter_success'))
+                        <p class="nl-msg ok" role="status"><i class="fa-solid fa-circle-check" aria-hidden="true"></i> {{ session('newsletter_success') }}</p>
+                    @elseif (session('newsletter_info'))
+                        <p class="nl-msg" role="status"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> {{ session('newsletter_info') }}</p>
+                    @elseif ($errors->has('email') && ! old('content') && ! old('message'))
+                        <p class="nl-msg err">{{ $errors->first('email') }}</p>
+                    @else
+                        <p class="nl-msg">Désinscription en un clic depuis chaque e-mail.</p>
+                    @endif
+                </form>
+            </div>
+        </section>
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-slate-900 text-white mt-20">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-                <!-- À propos -->
-                <div>
-                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
-                        <i class="fas fa-church text-blue-400"></i>
-                        Hope Media RDC
-                    </h3>
-                    <p class="text-slate-300 text-sm">
-                        Plateforme officielle de l'Église Adventiste du 7ème Jour - Union du Congo Ouest
-                    </p>
+    {{-- Pied de page --}}
+    <footer class="site-footer">
+        <div class="wrap">
+            <div class="f-grid">
+                <div class="f-brand">
+                    <div class="logos">
+                        <img class="l-dark" src="{{ asset('images/brand/logo-hope-media-negatif.webp') }}" alt="Hope Media Network-DRC" width="360" height="314" loading="lazy">
+                        <img class="l-light" src="{{ asset('images/brand/logo-hope-media.webp') }}" alt="Hope Media Network-DRC" width="360" height="314" loading="lazy">
+                        <img class="l-dark" src="{{ asset('images/brand/logo-adventiste-blanc.webp') }}" alt="Église Adventiste du Septième Jour" width="160" height="133" loading="lazy">
+                        <img class="l-light" src="{{ asset('images/brand/logo-adventiste.webp') }}" alt="Église Adventiste du Septième Jour" width="160" height="133" loading="lazy">
+                    </div>
+                    <span class="f-slogan">La Parole qui éclaire</span>
+                    <p>Vidéos, enseignements et actualités de la mission, sur tous vos écrans et tous vos réseaux.</p>
                 </div>
-
-                <!-- Liens rapides -->
+                {{-- Pas de liens de navigation ici : ils sont déjà dans le menu principal et le menu ☰ --}}
                 <div>
-                    <h4 class="text-lg font-semibold mb-4">Liens rapides</h4>
-                    <ul class="space-y-2 text-sm text-slate-300">
-                        <li><a href="{{ route('home') }}" class="hover:text-blue-400 transition">Accueil</a></li>
-                        <li><a href="{{ route('news.index') }}" class="hover:text-blue-400 transition">Actualités</a></li>
-                        <li><a href="{{ route('contact.create') }}" class="hover:text-blue-400 transition">Nous contacter</a></li>
-                        <li><a href="{{ route('contact.prayer') }}" class="hover:text-blue-400 transition">Demande de prière</a></li>
-                    </ul>
-                </div>
-
-                <!-- Plateformes -->
-                <div>
-                    <h4 class="text-lg font-semibold mb-4">Nos plateformes</h4>
-                    <ul class="space-y-2 text-sm text-slate-300">
-                        <li><a href="{{ route('videos.index', ['platform' => 'youtube']) }}" class="hover:text-red-400 transition"><i class="fa-brands fa-youtube mr-1 text-red-400"></i> YouTube</a></li>
-                        <li><a href="{{ route('videos.index', ['platform' => 'facebook']) }}" class="hover:text-blue-400 transition"><i class="fa-brands fa-facebook mr-1 text-blue-400"></i> Facebook</a></li>
-                        <li><a href="{{ route('videos.index', ['platform' => 'instagram']) }}" class="hover:text-pink-400 transition"><i class="fa-brands fa-instagram mr-1 text-pink-400"></i> Instagram</a></li>
-                        <li><a href="{{ route('videos.index', ['platform' => 'tiktok']) }}" class="hover:text-slate-300 transition"><i class="fa-brands fa-tiktok mr-1"></i> TikTok</a></li>
-                    </ul>
-                </div>
-
-                <!-- Contact -->
-                <div>
-                    <h4 class="text-lg font-semibold mb-4">Nous suivre</h4>
-                    <div class="flex gap-4">
-                        <a href="#" class="text-white hover:text-blue-400 transition">
-                            <i class="fab fa-facebook text-2xl"></i>
-                        </a>
-                        <a href="#" class="text-white hover:text-blue-400 transition">
-                            <i class="fab fa-youtube text-2xl"></i>
-                        </a>
-                        <a href="#" class="text-white hover:text-blue-400 transition">
-                            <i class="fab fa-whatsapp text-2xl"></i>
-                        </a>
-                        <a href="#" class="text-white hover:text-blue-400 transition">
-                            <i class="fab fa-instagram text-2xl"></i>
-                        </a>
+                    <h3>La rédaction</h3>
+                    <address>
+                        <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>01 Lubumbashi, Q. Pigeon, C. Ngaliema, Kinshasa</span>
+                        <span><i class="fa-solid fa-phone" aria-hidden="true"></i><a href="tel:+243852283241">+243 852 283 241</a></span>
+                        <span><i class="fa-solid fa-envelope" aria-hidden="true"></i><a href="mailto:hopemediasociaux@gmail.com">hopemediasociaux@gmail.com</a></span>
+                    </address>
+                    <div class="f-social">
+                        <a class="p-youtube" href="{{ $youtubeChannel }}" target="_blank" rel="noopener" aria-label="Chaîne YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i></a>
                     </div>
                 </div>
             </div>
-
-            <div class="border-t border-slate-700 pt-8 flex justify-between items-center">
-                <p class="text-slate-300 text-sm">&copy; {{ date('Y') }} Hope Media RDC. Tous droits réservés. Église Adventiste du 7ème Jour - UCO.</p>
-                <a href="{{ route('admin.dashboard') }}" class="text-slate-400 hover:text-blue-400 transition text-sm font-semibold flex items-center gap-2">
-                    <i class="fas fa-lock"></i>
-                    Admin
-                </a>
+            <div class="f-bottom">
+                <span>&copy; {{ date('Y') }} Hope Media RDC. Église Adventiste du 7ème Jour - UCO</span>
             </div>
         </div>
     </footer>
 
-    <!-- Scripts -->
-    <script>
-        // Toggle Mobile Menu
-        document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
-            document.getElementById('mobile-menu').classList.toggle('hidden');
-        });
+    {{-- Barre d'onglets (téléphone) --}}
+    <nav class="tabbar" aria-label="Navigation mobile">
+        <a href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="fa-solid fa-house" aria-hidden="true"></i>Accueil</a>
+        <a href="{{ route('videos.index') }}" @if (request()->routeIs('videos.*')) aria-current="page" @endif><i class="fa-solid fa-circle-play" aria-hidden="true"></i>Vidéos</a>
+        <a class="tab-live" href="{{ $youtubeChannel }}/live" target="_blank" rel="noopener"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>Direct</a>
+        <a href="{{ route('posts.index') }}" @if (request()->routeIs('posts.*')) aria-current="page" @endif><i class="fa-solid fa-book-open" aria-hidden="true"></i>Enseign.</a>
+        <a href="{{ route('contact.prayer') }}" @if (request()->routeIs('contact.prayer')) aria-current="page" @endif><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Prière</a>
+    </nav>
 
-        // Close mobile menu when clicking on a link
-        document.querySelectorAll('#mobile-menu a').forEach(link => {
-            link.addEventListener('click', function() {
-                document.getElementById('mobile-menu').classList.add('hidden');
-            });
-        });
-    </script>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-    <!-- Vite JS -->
-    @vite('resources/js/app.js')
     @stack('scripts')
 </body>
-
 </html>

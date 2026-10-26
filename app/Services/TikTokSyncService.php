@@ -7,6 +7,8 @@ namespace App\Services;
 use App\Enums\VideoPlatform;
 use App\Models\SocialFeed;
 use App\Models\Video;
+use Closure;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -14,32 +16,29 @@ use Illuminate\Support\Facades\Log;
 /**
  * Service de synchronisation automatique des vidéos d'un compte TikTok.
  *
- * Utilise TikTok Content API v2 :
- *   POST https://open.tiktokapis.com/v2/video/list/
+ * Utilise TikTok API v2 (Display API) :
+ *   POST https://open.tiktokapis.com/v2/video/list/?fields=…   corps JSON : {"max_count": 20}
+ *   GET  https://open.tiktokapis.com/v2/user/info/?fields=…
  *
  * Prérequis :
- *   1. Créer une app sur https://developers.tiktok.com/
- *   2. Activer le produit "Login Kit" + les scopes : video.list, user.info.basic
- *   3. Faire passer le propriétaire du compte TikTok par le flux OAuth 2.0
- *      (Login Kit) pour obtenir un access_token et un open_id.
- *   4. Variables .env :
- *        TIKTOK_CLIENT_KEY     = votre Client Key
- *        TIKTOK_CLIENT_SECRET  = votre Client Secret
- *        TIKTOK_ACCESS_TOKEN   = access_token OAuth de l'utilisateur
- *        TIKTOK_OPEN_ID        = open_id de l'utilisateur
+ *   1. Créer une app sur https://developers.tiktok.com/ (produit « Login Kit »,
+ *      autorisations user.info.basic et video.list).
+ *   2. Faire autoriser l'app par le compte TikTok (OAuth 2.0) pour obtenir
+ *      access_token, refresh_token et open_id.
+ *   3. Saisir ces valeurs dans Admin → Réseaux sociaux.
  *
  * Gestion du token :
- *   Les access_tokens TikTok expirent après 24 h. Ce service tente de
- *   renouveler automatiquement le token via le refresh_token si TIKTOK_REFRESH_TOKEN
- *   est défini dans le .env. En production, implémentez un stockage persistant
- *   du refresh_token (base de données recommandée).
+ *   L'access_token expire après 24 h. En cas de refus (401 ou access_token_invalid),
+ *   le service le renouvelle avec le refresh_token et appelle $onTokenRefreshed,
+ *   qui enregistre les nouveaux jetons en base (voir SocialSyncManager).
  *
  * Documentation : https://developers.tiktok.com/doc/tiktok-api-v2-video-list
  */
 final class TikTokSyncService
 {
-    private const API_BASE        = 'https://open.tiktokapis.com/v2';
-    private const TOKEN_ENDPOINT  = 'https://open.tiktokapis.com/v2/oauth/token/';
+    private const API_BASE       = 'https://open.tiktokapis.com/v2';
+    private const TOKEN_ENDPOINT = 'https://open.tiktokapis.com/v2/oauth/token/';
+    private const VIDEO_FIELDS   = 'id,title,video_description,cover_image_url,share_url,create_time,duration,like_count,comment_count,view_count,share_count';
 
     public function __construct(
         private readonly string $clientKey,
@@ -47,7 +46,12 @@ final class TikTokSyncService
         private string          $accessToken,
         private readonly string $openId,
         private readonly int    $maxResults = 20,
-    ) {}
+        private ?string         $refreshToken = null,
+        /** @var Closure(string $accessToken, ?string $refreshToken): void|null */
+        private readonly ?Closure $onTokenRefreshed = null,
+    ) {
+        $this->refreshToken ??= config('services.tiktok.refresh_token');
+    }
 
     // -------------------------------------------------------------------------
     // API publique
@@ -57,15 +61,16 @@ final class TikTokSyncService
      * Récupère les dernières vidéos du compte TikTok et les persiste en base.
      *
      * @return int Nombre de vidéos créées ou mises à jour.
-     *
-     * @throws \RuntimeException Si l'authentification échoue.
      */
     public function syncLatestVideos(): int
     {
-        $items = $this->fetchVideos();
+        $data = $this->call(fn () => Http::timeout(15)->withToken($this->accessToken)
+            ->post(self::API_BASE . '/video/list/?fields=' . self::VIDEO_FIELDS, [
+                'max_count' => min(max($this->maxResults, 1), 20), // TikTok : 20 au maximum par page
+            ]));
 
         $synced = 0;
-        foreach ($items as $item) {
+        foreach ($data['videos'] ?? [] as $item) {
             $this->upsertVideo($item);
             $synced++;
         }
@@ -73,96 +78,89 @@ final class TikTokSyncService
         return $synced;
     }
 
+    /**
+     * Vérifie les jetons, sans rien enregistrer.
+     *
+     * @return string Nom affiché du compte TikTok.
+     */
+    public function testConnection(): string
+    {
+        $data = $this->call(fn () => Http::timeout(15)->withToken($this->accessToken)
+            ->get(self::API_BASE . '/user/info/', ['fields' => 'open_id,display_name']));
+
+        return $data['user']['display_name'] ?? throw new \RuntimeException('Compte TikTok introuvable.');
+    }
+
     // -------------------------------------------------------------------------
-    // Méthodes privées — appels API
+    // Méthodes privées
     // -------------------------------------------------------------------------
 
     /**
-     * Récupère la liste des vidéos via l'endpoint /v2/video/list/.
+     * Exécute un appel ; si le jeton est refusé, le renouvelle et réessaie une fois.
      *
-     * @return array<int, array>
+     * @param  Closure(): Response $send
      */
-    private function fetchVideos(): array
+    private function call(Closure $send): array
     {
         try {
-            $response = Http::timeout(15)
-                ->withToken($this->accessToken)
-                ->post(self::API_BASE . '/video/list/', [
-                    'fields' => 'id,title,video_description,cover_image_url,'
-                        . 'share_url,create_time,duration,like_count,'
-                        . 'comment_count,view_count,share_count',
-                    'max_count' => min($this->maxResults, 20), // TikTok limite à 20 par page
-                ]);
-
-            // 401 → token expiré, on tente le renouvellement
-            if ($response->status() === 401) {
+            $response = $send();
+            if ($this->tokenRejected($response)) {
                 Log::info('TikTokSyncService: token expiré, tentative de renouvellement.');
                 $this->refreshAccessToken();
-
-                // Deuxième tentative après renouvellement
-                $response = Http::timeout(15)
-                    ->withToken($this->accessToken)
-                    ->post(self::API_BASE . '/video/list/', [
-                        'fields' => 'id,title,video_description,cover_image_url,'
-                            . 'share_url,create_time,duration,like_count,'
-                            . 'comment_count,view_count,share_count',
-                        'max_count' => min($this->maxResults, 20),
-                    ]);
+                $response = $send();
             }
-
-            if ($response->failed()) {
-                $error = $response->json('error.message') ?? $response->body();
-                Log::error('TikTokSyncService: erreur API.', ['error' => $error]);
-                throw new \RuntimeException("TikTok API error: {$error}");
-            }
-
-            return $response->json('data.videos') ?? [];
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             Log::error('TikTokSyncService: connexion impossible.', ['error' => $e->getMessage()]);
-            throw $e;
+            throw new \RuntimeException('Impossible de joindre TikTok. Vérifiez la connexion internet du serveur.', 0, $e);
         }
+
+        $errorCode = $response->json('error.code');
+        if ($response->failed() || ($errorCode && $errorCode !== 'ok')) {
+            $error = $response->json('error.message') ?: ($errorCode ?: $response->body());
+            Log::error('TikTokSyncService: erreur API.', ['error' => $error]);
+            throw new \RuntimeException("TikTok : {$error}");
+        }
+
+        return $response->json('data') ?? [];
+    }
+
+    private function tokenRejected(Response $response): bool
+    {
+        return $response->status() === 401
+            || in_array($response->json('error.code'), ['access_token_invalid', 'access_token_expired'], true);
     }
 
     /**
-     * Renouvelle le token d'accès via le refresh_token stocké en .env.
-     * En production, persistez le nouveau token en base de données.
+     * Renouvelle l'access_token avec le refresh_token, puis signale les nouveaux jetons.
      *
      * @throws \RuntimeException Si le renouvellement échoue.
      */
     private function refreshAccessToken(): void
     {
-        $refreshToken = config('services.tiktok.refresh_token');
-        if (empty($refreshToken)) {
-            throw new \RuntimeException(
-                'TikTok: access_token expiré et TIKTOK_REFRESH_TOKEN non défini. '
-                    . 'Relancez le flux OAuth pour obtenir un nouveau token.'
-            );
+        if (empty($this->refreshToken)) {
+            throw new \RuntimeException('TikTok : l’Access Token a expiré et aucun Refresh Token n’est enregistré. Saisissez-en un dans l’admin.');
         }
 
         $response = Http::timeout(10)->asForm()->post(self::TOKEN_ENDPOINT, [
             'client_key'    => $this->clientKey,
             'client_secret' => $this->clientSecret,
             'grant_type'    => 'refresh_token',
-            'refresh_token' => $refreshToken,
+            'refresh_token' => $this->refreshToken,
         ]);
 
         if ($response->failed() || empty($response->json('access_token'))) {
-            throw new \RuntimeException(
-                'TikTok: échec du renouvellement du token. Relancez le flux OAuth.'
-            );
+            throw new \RuntimeException('TikTok : le renouvellement du jeton a échoué. Refaites l’autorisation du compte TikTok et saisissez les nouveaux jetons.');
         }
 
-        $this->accessToken = $response->json('access_token');
+        $this->accessToken  = $response->json('access_token');
+        $this->refreshToken = $response->json('refresh_token') ?: $this->refreshToken;
 
-        // Log pour rappeler à l'administrateur de mettre à jour le .env
-        Log::warning('TikTokSyncService: token renouvelé. Mettez à jour TIKTOK_ACCESS_TOKEN dans .env.', [
-            'new_token_prefix' => substr($this->accessToken, 0, 10) . '...',
-        ]);
+        if ($this->onTokenRefreshed) {
+            ($this->onTokenRefreshed)($this->accessToken, $this->refreshToken);
+        }
+
+        Log::info('TikTokSyncService: jeton renouvelé et enregistré.');
     }
-
-    // -------------------------------------------------------------------------
-    // Méthodes privées — persistance
-    // -------------------------------------------------------------------------
 
     /**
      * Crée ou met à jour un enregistrement Video à partir d'une vidéo TikTok.
@@ -170,12 +168,10 @@ final class TikTokSyncService
     private function upsertVideo(array $item): void
     {
         $videoId     = (string) ($item['id'] ?? '');
-        $title       = $item['title'] ?: ($item['video_description'] ?? 'Vidéo TikTok');
+        $title       = ($item['title'] ?? '') ?: (($item['video_description'] ?? '') ?: 'Vidéo TikTok');
         $thumbnail   = $item['cover_image_url'] ?? null;
         $shareUrl    = $item['share_url'] ?? null;
-        $publishedAt = isset($item['create_time'])
-            ? Carbon::createFromTimestamp($item['create_time'])
-            : null;
+        $publishedAt = isset($item['create_time']) ? Carbon::createFromTimestamp($item['create_time']) : null;
 
         SocialFeed::updateOrCreate(
             ['platform' => VideoPlatform::TikTok->value, 'platform_id' => $videoId],
@@ -185,7 +181,7 @@ final class TikTokSyncService
                 'body'           => $item['video_description'] ?? null,
                 'thumbnail_url'  => $thumbnail,
                 'post_url'       => $shareUrl,
-                'source_id'      => $this->openId,
+                'source_id'      => $this->openId ?: null,
                 'published_at'   => $publishedAt,
                 'duration'       => isset($item['duration']) ? (string) $item['duration'] : null,
                 'view_count'     => (int) ($item['view_count'] ?? 0),
@@ -204,7 +200,7 @@ final class TikTokSyncService
                 'description'    => $item['video_description'] ?? null,
                 'thumbnail_url'  => $thumbnail,
                 'post_url'       => $shareUrl,
-                'channel_id'     => $this->openId,
+                'channel_id'     => $this->openId ?: null,
                 'channel_title'  => 'TikTok',
                 'published_at'   => $publishedAt,
                 'duration'       => isset($item['duration']) ? (string) $item['duration'] : null,

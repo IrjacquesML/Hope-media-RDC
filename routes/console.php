@@ -9,51 +9,15 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // ---------------------------------------------------------------------------
-// Scheduler : synchronisation automatique des contenus sociaux
+// Synchronisation automatique des réseaux sociaux (YouTube, Facebook, Instagram, TikTok, X).
+// La fréquence de chaque réseau se règle dans Admin → Réseaux sociaux ; cette tâche vérifie
+// toutes les 15 minutes quels réseaux sont à synchroniser.
+// Fréquences conseillées : YouTube 6 h (quota 10 000 unités/jour), Facebook et Instagram 3 h,
+// TikTok 6 h, X 12 h (l'API X limite fortement le nombre de requêtes).
 //
-// Quota indicatif :
-//   YouTube   : ~3 unités/synchro · quota gratuit 10 000/jour → toutes les 6h
-//   Facebook  : 200 appels/heure par token → toutes les 3h
-//   Instagram : 200 appels/heure par token → toutes les 3h
-//   TikTok    : limite par app (voir dashboard TikTok for Developers) → toutes les 6h
-//
-// Pour activer le scheduler, ajouter cette ligne au cron du serveur :
-//   * * * * * cd /chemin/du/projet && php artisan schedule:run >> /dev/null 2>&1
-// ---------------------------------------------------------------------------
-
-// ── YouTube ──────────────────────────────────────────────────────────────────
-Schedule::command('youtube:sync', [
-    '--max=' . config('services.youtube.max_results', 10),
-    '--now',
-])
-    ->everySixHours()
+// Pour activer le planificateur, ajoutez cette ligne au cron du serveur (crontab -e) :
+//   * * * * * cd /chemin/du/site && php artisan schedule:run >> /dev/null 2>&1
+Schedule::command('social:sync')
+    ->everyFifteenMinutes()
     ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/youtube-sync.log'));
-
-// ── Facebook ─────────────────────────────────────────────────────────────────
-Schedule::command('facebook:sync', [
-    '--max=' . config('services.facebook.max_results', 20),
-    '--now',
-])
-    ->everyThreeHours()
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/facebook-sync.log'));
-
-// ── Instagram ─────────────────────────────────────────────────────────────────
-Schedule::command('instagram:sync', [
-    '--max=' . config('services.instagram.max_results', 20),
-    '--now',
-])
-    ->everyThreeHours()
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/instagram-sync.log'));
-
-// ── TikTok ───────────────────────────────────────────────────────────────────
-Schedule::command('tiktok:sync', [
-    '--max=' . config('services.tiktok.max_results', 20),
-    '--now',
-])
-    ->everySixHours()
-    ->withoutOverlapping()
-    ->appendOutputTo(storage_path('logs/tiktok-sync.log'));
-
+    ->appendOutputTo(storage_path('logs/social-sync.log'));

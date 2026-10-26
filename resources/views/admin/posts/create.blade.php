@@ -35,19 +35,19 @@
             </div>
 
             <!-- Champ URL + bouton -->
-            <div class="flex gap-2">
+            <div class="flex flex-col sm:flex-row gap-2">
                 <input
                     type="url"
                     id="social-import-url"
                     placeholder="https://www.youtube.com/watch?v=... ou lien TikTok / Instagram / Facebook"
-                    class="flex-1 px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
+                    class="flex-1 min-w-0 px-4 py-2 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm"
                     oninput="detectPlatformBadge(this.value)"
                 />
                 <button
                     type="button"
                     id="social-import-btn"
                     onclick="importSocialMedia()"
-                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition font-semibold text-sm whitespace-nowrap flex items-center gap-2"
+                    class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition font-semibold text-sm whitespace-nowrap flex items-center justify-center gap-2"
                 >
                     <i class="fas fa-download" id="import-btn-icon"></i>
                     <span id="import-btn-text">Récupérer</span>
@@ -167,7 +167,7 @@
             <!-- URL Vidéo -->
             <div id="video-content" class="content-field hidden space-y-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div class="flex gap-4 mb-4">
+                    <div class="flex flex-wrap gap-4 mb-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="video_source" value="url" checked onchange="toggleVideoSource('url')" class="w-4 h-4">
                             <span class="font-medium">URL de la vidéo</span>
@@ -212,7 +212,7 @@
             <!-- URL Image -->
             <div id="image-content" class="content-field hidden space-y-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div class="flex gap-4 mb-4">
+                    <div class="flex flex-wrap gap-4 mb-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="image_source" value="url" checked onchange="toggleImageSource('url')" class="w-4 h-4">
                             <span class="font-medium">URL de l'image</span>
@@ -251,7 +251,7 @@
             <!-- URL Audio -->
             <div id="audio-content" class="content-field hidden space-y-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div class="flex gap-4 mb-4">
+                    <div class="flex flex-wrap gap-4 mb-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="audio_source" value="url" checked onchange="toggleAudioSource('url')" class="w-4 h-4">
                             <span class="font-medium">URL de l'audio</span>

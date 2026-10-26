@@ -12,6 +12,7 @@ use App\Http\Controllers\ResourceController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\LikeController;
+use App\Http\Controllers\AdminSocialController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -111,6 +112,9 @@ Route::prefix('auth')->name('auth.')->group(function () {
     });
 });
 
+// Raccourci de connexion admin : /login (aucun lien visible sur le site public)
+Route::get('/login', [AuthController::class, 'showLoginForm'])->middleware('guest')->name('login');
+
 // ROUTES ADMINISTRATION
 Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
     // Dashboard
@@ -151,7 +155,15 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::post('/sync/{platform}', [AdminController::class, 'syncVideos'])->name('sync');
         Route::delete('/{video}', [AdminController::class, 'deleteVideo'])->name('delete');
     });
-    
+
+    // Réseaux sociaux : identifiants, test de connexion, synchronisation
+    Route::prefix('reseaux-sociaux')->name('social.')->group(function () {
+        Route::get('/', [AdminSocialController::class, 'index'])->name('index');
+        Route::put('/{platform}', [AdminSocialController::class, 'update'])->name('update');
+        Route::post('/{platform}/test', [AdminSocialController::class, 'test'])->name('test');
+        Route::post('/{platform}/sync', [AdminSocialController::class, 'sync'])->name('sync');
+    });
+
     // Contacts
     Route::prefix('contacts')->name('contacts.')->group(function () {
         Route::get('/', [AdminController::class, 'contacts'])->name('index');

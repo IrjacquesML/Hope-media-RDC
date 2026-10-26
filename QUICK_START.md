@@ -1,5 +1,9 @@
 # 🚀 Quick Start Guide - Hope Media DRC
 
+> ⚠️ **Serveur de production (VPS)** : ce guide concerne l'installation sur un poste de développement.
+> Sur le VPS, ne lancez jamais `migrate:refresh`, `migrate:fresh` ni `db:seed` : ces commandes vident ou modifient la base.
+> Pour mettre à jour le site en ligne sans perdre de données, suivez [DEPLOIEMENT.md](DEPLOIEMENT.md) (`bash scripts/deploy.sh`).
+
 ## ⚡ Démarrage Rapide (5 minutes)
 
 ### 1. Préparation de l'environnement

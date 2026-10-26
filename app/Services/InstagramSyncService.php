@@ -12,26 +12,26 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Service de synchronisation automatique des médias d'un compte Instagram Business.
+ * Service de synchronisation des médias d'un compte Instagram professionnel.
  *
- * Utilise Instagram Graph API (via Facebook Graph API v19.0) :
- *   GET /{ig-user-id}/media?fields=id,caption,media_type,media_url,thumbnail_url,
- *                                  permalink,timestamp,like_count,comments_count
- *                          &access_token={long-lived-token}
+ * Deux types de jetons sont acceptés :
+ *   - Jeton « Instagram Login » (commence par IG…) :
+ *       GET https://graph.instagram.com/v21.0/me/media
+ *   - Jeton Facebook (commence par EA…) + ID du compte Instagram professionnel :
+ *       GET https://graph.facebook.com/v21.0/{ig-user-id}/media
  *
- * Prérequis :
- *   - Un compte Instagram Business ou Creator
- *   - Relié à une Page Facebook gérée par votre compte
- *   - Une app Facebook avec la permission instagram_basic
- *   - Variables .env : INSTAGRAM_USER_ID, INSTAGRAM_ACCESS_TOKEN
+ * Champs : id, caption, media_type, media_url, thumbnail_url, permalink, timestamp,
+ *          like_count, comments_count, username
  *
- * Types de médias supportés : IMAGE, VIDEO, CAROUSEL_ALBUM
+ * Tous les médias vont dans le flux social ; seules les vidéos et Reels
+ * sont ajoutés aux vidéos du site.
  *
- * Documentation : https://developers.facebook.com/docs/instagram-api/reference/ig-user/media
+ * Documentation : https://developers.facebook.com/docs/instagram-platform
  */
 final class InstagramSyncService
 {
-    private const GRAPH_BASE = 'https://graph.facebook.com/v19.0';
+    private const FACEBOOK_GRAPH  = 'https://graph.facebook.com/v21.0';
+    private const INSTAGRAM_GRAPH = 'https://graph.instagram.com/v21.0';
 
     public function __construct(
         private readonly string $igUserId,
@@ -46,102 +46,101 @@ final class InstagramSyncService
     /**
      * Récupère les derniers médias du compte Instagram et les persiste en base.
      *
-     * @return int Nombre d'enregistrements créés ou mis à jour.
+     * @return int Nombre de vidéos créées ou mises à jour sur le site.
      */
     public function syncLatestMedia(): int
     {
-        $items = $this->fetchMedia();
+        $items = $this->request('/media', [
+            'fields' => 'id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count,username',
+            'limit'  => min(max($this->maxResults, 1), 100),
+        ])['data'] ?? [];
 
         $synced = 0;
         foreach ($items as $item) {
-            $this->upsertMedia($item);
-            $synced++;
+            if ($this->upsertMedia($item)) {
+                $synced++;
+            }
         }
 
         return $synced;
     }
 
-    // -------------------------------------------------------------------------
-    // Méthodes privées — appels API
-    // -------------------------------------------------------------------------
-
     /**
-     * Récupère les médias depuis l'API Instagram Graph.
+     * Vérifie le jeton et le compte, sans rien enregistrer.
      *
-     * @return array<int, array>
+     * @return string Nom du compte (@username).
      */
-    private function fetchMedia(): array
+    public function testConnection(): string
     {
-        try {
-            $response = Http::timeout(15)->get(self::GRAPH_BASE . "/{$this->igUserId}/media", [
-                'fields'       => 'id,caption,media_type,media_url,thumbnail_url,'
-                    . 'permalink,timestamp,like_count,comments_count,username',
-                'limit'        => $this->maxResults,
-                'access_token' => $this->accessToken,
-            ]);
+        $username = $this->request('', ['fields' => 'username'])['username'] ?? null;
 
-            if ($response->failed()) {
-                $error = $response->json('error.message') ?? $response->body();
-                Log::error('InstagramSyncService: erreur API.', ['error' => $error]);
-                throw new \RuntimeException("Instagram Graph API error: {$error}");
-            }
-
-            return $response->json('data') ?? [];
-        } catch (\Illuminate\Http\Client\ConnectionException $e) {
-            Log::error('InstagramSyncService: connexion impossible.', ['error' => $e->getMessage()]);
-            throw $e;
-        }
+        return $username ? '@' . $username : throw new \RuntimeException('Compte Instagram introuvable.');
     }
 
     // -------------------------------------------------------------------------
-    // Méthodes privées — persistance
+    // Méthodes privées
     // -------------------------------------------------------------------------
 
-    /**
-     * Crée ou met à jour un enregistrement Video à partir d'un média Instagram.
-     *
-     * L'identifiant unique est l'ID Instagram du média.
-     */
-    private function upsertMedia(array $item): void
+    /** Le jeton vient-il de la « connexion Instagram » (graph.instagram.com) ? */
+    private function usesInstagramLogin(): bool
     {
-        $mediaId     = $item['id'];
+        return str_starts_with($this->accessToken, 'IG');
+    }
+
+    /** Appel GET sur le compte (« me » ou l'ID du compte) suivi de $path. */
+    private function request(string $path, array $params): array
+    {
+        if ($this->usesInstagramLogin()) {
+            $url = self::INSTAGRAM_GRAPH . '/me' . $path;
+        } elseif ($this->igUserId !== '') {
+            $url = self::FACEBOOK_GRAPH . '/' . $this->igUserId . $path;
+        } else {
+            throw new \RuntimeException('Instagram : avec un jeton Facebook (EAA…), renseignez aussi l’ID du compte Instagram professionnel.');
+        }
+
+        try {
+            $response = Http::timeout(15)->get($url, $params + ['access_token' => $this->accessToken]);
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('InstagramSyncService: connexion impossible.', ['error' => $e->getMessage()]);
+            throw new \RuntimeException('Impossible de joindre Instagram. Vérifiez la connexion internet du serveur.', 0, $e);
+        }
+
+        if ($response->failed()) {
+            $error = $response->json('error.message') ?? $response->body();
+            $hint = (int) $response->json('error.code') === 190 ? ' (jeton expiré : générez un nouveau jeton)' : '';
+            Log::error('InstagramSyncService: erreur API.', ['error' => $error]);
+            throw new \RuntimeException("Instagram : {$error}{$hint}");
+        }
+
+        return $response->json() ?? [];
+    }
+
+    /**
+     * Enregistre un média dans le flux social, et dans les vidéos du site s'il s'agit d'une vidéo.
+     *
+     * @return bool true si une vidéo a été créée ou mise à jour.
+     */
+    private function upsertMedia(array $item): bool
+    {
+        $mediaId     = (string) $item['id'];
         $caption     = $item['caption'] ?? '';
         $title       = $this->extractTitle($caption);
         $mediaType   = $item['media_type'] ?? 'IMAGE';   // IMAGE | VIDEO | CAROUSEL_ALBUM
         $permalink   = $item['permalink'] ?? null;
-
-        // Pour les vidéos : thumbnail_url = miniature générée par Instagram
-        // Pour les images : media_url est l'image directement
-        $thumbnail = match ($mediaType) {
-            'VIDEO'          => $item['thumbnail_url'] ?? $item['media_url'] ?? null,
-            'CAROUSEL_ALBUM' => $item['media_url'] ?? null,
-            default          => $item['media_url'] ?? null,
-        };
-
-        $publishedAt = isset($item['timestamp'])
-            ? Carbon::parse($item['timestamp'])
-            : null;
-
-        // Le shortcode Instagram est extrait depuis le permalink (ex: /p/CxYZ123/)
-        $shortcode = $this->extractShortcode($permalink ?? '');
-
-        // Traduit le type API Instagram vers le type générique du feed
-        $feedMediaType = match ($mediaType) {
-            'VIDEO'          => 'video',
-            'CAROUSEL_ALBUM' => 'carousel',
-            default          => 'image',   // IMAGE
-        };
+        $thumbnail   = $mediaType === 'VIDEO' ? ($item['thumbnail_url'] ?? $item['media_url'] ?? null) : ($item['media_url'] ?? null);
+        $publishedAt = isset($item['timestamp']) ? Carbon::parse($item['timestamp']) : null;
+        $shortcode   = $this->extractShortcode($permalink ?? '') ?: $mediaId;
 
         SocialFeed::updateOrCreate(
-            ['platform' => VideoPlatform::Instagram->value, 'platform_id' => $shortcode ?: $mediaId],
+            ['platform' => VideoPlatform::Instagram->value, 'platform_id' => $shortcode],
             [
-                'media_type'     => $feedMediaType,
+                'media_type'     => match ($mediaType) { 'VIDEO' => 'video', 'CAROUSEL_ALBUM' => 'carousel', default => 'image' },
                 'title'          => $title,
                 'body'           => $caption,
                 'thumbnail_url'  => $thumbnail,
                 'media_url'      => $item['media_url'] ?? null,
                 'post_url'       => $permalink,
-                'source_id'      => $this->igUserId,
+                'source_id'      => $this->igUserId ?: null,
                 'source_name'    => $item['username'] ?? null,
                 'published_at'   => $publishedAt,
                 'likes_count'    => (int) ($item['like_count'] ?? 0),
@@ -151,24 +150,28 @@ final class InstagramSyncService
             ]
         );
 
+        if ($mediaType !== 'VIDEO') {
+            return false;
+        }
+
         Video::updateOrCreate(
-            ['platform' => VideoPlatform::Instagram->value, 'video_id' => $shortcode ?: $mediaId],
+            ['platform' => VideoPlatform::Instagram->value, 'video_id' => $shortcode],
             [
                 'title'          => $title,
                 'description'    => $caption,
                 'thumbnail_url'  => $thumbnail,
                 'post_url'       => $permalink,
-                'channel_id'     => $this->igUserId,
+                'channel_id'     => $this->igUserId ?: null,
                 'channel_title'  => $item['username'] ?? 'Instagram',
                 'published_at'   => $publishedAt,
-                'duration'       => null,
-                'view_count'     => 0,
                 'likes_count'    => (int) ($item['like_count'] ?? 0),
                 'comments_count' => (int) ($item['comments_count'] ?? 0),
                 'synced_at'      => now(),
                 'raw_metadata'   => $item,
             ]
         );
+
+        return true;
     }
 
     /**
@@ -176,28 +179,22 @@ final class InstagramSyncService
      */
     private function extractTitle(string $caption): string
     {
-        if ($caption === '') {
-            return 'Post Instagram';
+        if (trim($caption) === '') {
+            return 'Vidéo Instagram';
         }
 
         $lines = array_filter(explode("\n", trim($caption)));
         $first = reset($lines) ?: $caption;
 
-        return mb_strlen($first) > 80
-            ? mb_substr($first, 0, 77) . '...'
-            : $first;
+        return mb_strlen($first) > 80 ? mb_substr($first, 0, 77) . '...' : $first;
     }
 
     /**
-     * Extrait le shortcode depuis un permalink Instagram.
-     * ex: https://www.instagram.com/p/CxYZ1234abcd/ → CxYZ1234abcd
+     * Extrait le shortcode depuis un permalink Instagram (publication, Reel ou IGTV).
+     * ex: https://www.instagram.com/reel/CxYZ1234abcd/ → CxYZ1234abcd
      */
     private function extractShortcode(string $permalink): ?string
     {
-        if (preg_match('#instagram\.com/p/([A-Za-z0-9_-]+)#', $permalink, $m)) {
-            return $m[1];
-        }
-
-        return null;
+        return preg_match('#instagram\.com/(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)#', $permalink, $m) ? $m[1] : null;
     }
 }

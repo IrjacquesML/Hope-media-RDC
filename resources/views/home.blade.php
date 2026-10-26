@@ -1,505 +1,276 @@
 @extends('layouts.app')
 
 @section('title', 'Accueil')
-@section('meta_description', 'Découvrez les enseignements bibliques de l\'Église Adventiste du 7ème Jour - Union du Congo Ouest')
+@section('meta_description', 'Hope Media RDC : vidéos, enseignements et actualités de la mission, en continu sur YouTube, Facebook, Instagram et TikTok. La Parole qui éclaire.')
+
+@php
+    $latestVideos = $latestVideos ?? collect();
+    $latestPublications = $latestPublications ?? collect();
+    $videosByPlatform = $videosByPlatform ?? [];
+    $platforms = [
+        'youtube'   => ['label' => 'YouTube',   'icon' => 'fa-youtube'],
+        'facebook'  => ['label' => 'Facebook',  'icon' => 'fa-facebook'],
+        'instagram' => ['label' => 'Instagram', 'icon' => 'fa-instagram'],
+        'tiktok'    => ['label' => 'TikTok',    'icon' => 'fa-tiktok'],
+        'x'         => ['label' => 'X',         'icon' => 'fa-x-twitter'],
+    ];
+    $decode = fn ($s) => html_entity_decode((string) $s, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    $pfOf = fn ($v) => is_object($v->platform) ? $v->platform->value : $v->platform;
+
+    // À la une : la dernière vidéo publiée, puis les suivantes en « À suivre »
+    $feature = $latestVideos->first();
+    $upNext = $latestVideos->slice(1, 3);
+    $featurePub = $feature ? null : $latestPublications->first();
+
+    // Rangées
+    $mostViewed = $latestVideos->filter(fn ($v) => $v->view_count > 0)->sortByDesc('view_count')->values();
+    $shorts = collect($videosByPlatform['instagram'] ?? [])->concat($videosByPlatform['tiktok'] ?? [])->sortByDesc('published_at')->values();
+    $teachings = $latestPublications->where('kind', 'post')->values();
+    $mission = $latestPublications->where('kind', 'news')->values();
+
+    $pubIcon = fn ($icon) => 'fa-' . (['file-text' => 'file-lines', 'play-circle' => 'circle-play'][$icon] ?? $icon);
+@endphp
 
 @section('content')
-    <!-- Héros plein écran -->
-    <section class="hero-section relative flex items-center text-white overflow-hidden">
-        <div class="absolute inset-0" id="hero-carousel" aria-hidden="true">
-            @foreach($heroSlides as $index => $slide)
-                <div class="hero-slide absolute inset-0 {{ $index === 0 ? 'opacity-100' : 'opacity-0' }} transition-opacity duration-[1600ms] ease-in-out">
-                    <div class="hero-bg absolute inset-0"
-                         style="background-image: url('{{ asset($slide->image) }}');"></div>
-                </div>
-            @endforeach
 
-            <div class="absolute inset-0 bg-gradient-to-b from-slate-950/75 via-slate-950/50 to-slate-950/85 pointer-events-none"></div>
-            <div class="absolute inset-0 bg-gradient-to-r from-blue-950/50 via-transparent to-transparent pointer-events-none"></div>
+{{-- À la une : fond = images du carrousel (admin), contenu = dernière vidéo publiée --}}
+<section class="hero" id="hero" aria-roledescription="carrousel" aria-label="À la une" data-slide-ms="6500">
+    @foreach ($heroSlides as $index => $slide)
+        <div class="hero-slide{{ $index === 0 ? ' is-active' : '' }}">
+            <img src="{{ asset($slide->image) }}" alt="" @if ($index === 0) fetchpriority="high" @else loading="lazy" @endif decoding="async">
+        </div>
+    @endforeach
+
+    <div class="wrap hero-inner hero-feature">
+        <div class="hero-copy">
+            @if ($feature)
+                @php $fpf = $pfOf($feature); $fTitle = $decode($feature->title); $fDur = $fpf === 'youtube' && $feature->duration ? \App\Helpers\MediaHelper::formatDuration($feature->duration) : null; @endphp
+                <div class="eyebrow">
+                    <span class="chip gold">À la une</span>
+                    <span><i class="fa-brands {{ $platforms[$fpf]['icon'] ?? 'fa-youtube' }}" aria-hidden="true"></i> {{ $platforms[$fpf]['label'] ?? ucfirst($fpf) }}</span>
+                    @if ($feature->published_at)<span class="sep"></span><span>{{ $feature->published_at->diffForHumans() }}</span>@endif
+                </div>
+                <h1 class="{{ trim((mb_strlen($fTitle) > 45 ? 'is-long' : '') . (($__t = html_entity_decode((string) $fTitle, ENT_QUOTES | ENT_HTML5, 'UTF-8')) === mb_strtoupper($__t) && preg_match('/\p{Lu}{4}/u', $__t) ? ' is-caps' : '')) }}">{{ $fTitle }}</h1>
+                @if ($feature->description)<p class="lead">{{ Str::limit(strip_tags($decode($feature->description)), 170) }}</p>@endif
+                <div class="hero-meta">
+                    @if ($fDur)<span><i class="fa-regular fa-clock" aria-hidden="true"></i>{{ $fDur }}</span>@endif
+                    @if ($feature->view_count)<span><i class="fa-regular fa-eye" aria-hidden="true"></i>{{ number_format($feature->view_count, 0, ',', ' ') }} vues</span>@endif
+                    @if ($feature->channel_title)<span>{{ $feature->channel_title }}</span>@endif
+                </div>
+                <div class="hero-cta">
+                    <a class="btn btn-gold" href="{{ route('videos.show', $feature) }}"><i class="fa-solid fa-play" aria-hidden="true"></i>Regarder</a>
+                    <a class="btn btn-ghost" href="{{ route('videos.index') }}"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>Toutes les vidéos</a>
+                </div>
+            @elseif ($featurePub)
+                <div class="eyebrow"><span class="chip gold">À la une</span><span>{{ $featurePub->badge }}</span>@if ($featurePub->date)<span class="sep"></span><span>{{ $featurePub->date->diffForHumans() }}</span>@endif</div>
+                <h1 class="{{ mb_strlen($featurePub->title) > 45 ? 'is-long' : '' }}">{{ $featurePub->title }}</h1>
+                @if ($featurePub->excerpt)<p class="lead">{{ Str::limit($featurePub->excerpt, 170) }}</p>@endif
+                <div class="hero-cta">
+                    <a class="btn btn-gold" href="{{ $featurePub->url }}"><i class="fa-solid fa-arrow-right" aria-hidden="true"></i>{{ $featurePub->kind === 'news' ? 'Lire' : 'Découvrir' }}</a>
+                    <a class="btn btn-ghost" href="{{ route('videos.index') }}"><i class="fa-solid fa-circle-play" aria-hidden="true"></i>Nos vidéos</a>
+                </div>
+            @else
+                <span class="hero-slogan">Hope Media RDC</span>
+                <h1>La Parole qui éclaire</h1>
+                <p class="lead">Vidéos, enseignements et actualités de la mission, en continu sur nos réseaux.</p>
+                <div class="hero-cta">
+                    <a class="btn btn-gold" href="{{ route('videos.index') }}"><i class="fa-solid fa-play" aria-hidden="true"></i>Regarder</a>
+                    <a class="btn btn-ghost" href="{{ route('posts.index') }}"><i class="fa-solid fa-book-open" aria-hidden="true"></i>Enseignements</a>
+                </div>
+            @endif
         </div>
 
-        <div class="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20 md:py-28">
-            <div class="max-w-3xl mx-auto text-center">
-                <p class="hero-fade text-xs sm:text-sm md:text-base tracking-[0.28em] uppercase text-amber-200/90 font-semibold mb-4 sm:mb-5">
-                    Hope Media RDC
-                </p>
+        @if ($feature)
+            <aside class="hero-next" aria-label="Vidéo à la une et à suivre">
+                <a class="hero-poster" href="{{ route('videos.show', $feature) }}" aria-label="Regarder : {{ $fTitle }}">
+                    @if ($feature->thumbnail_url)
+                        <img src="{{ $feature->thumbnail_url }}" alt="" decoding="async">
+                    @else
+                        <x-site.art :seed="$feature->id" icon="fa-circle-play" />
+                    @endif
+                    <span class="big-play" aria-hidden="true"><i class="fa-solid fa-play"></i></span>
+                </a>
+                @if ($upNext->isNotEmpty())
+                    <p class="hero-next-title">À suivre</p>
+                    @foreach ($upNext as $v)
+                        <a class="hero-next-item" href="{{ route('videos.show', $v) }}">
+                            <span class="thumb">
+                                @if ($v->thumbnail_url)<img src="{{ $v->thumbnail_url }}" alt="" loading="lazy">@else<x-site.art :seed="$v->id" icon="fa-circle-play" />@endif
+                            </span>
+                            <span>
+                                <strong class="{{ trim(($__t = html_entity_decode((string) $v->title, ENT_QUOTES | ENT_HTML5, 'UTF-8')) === mb_strtoupper($__t) && preg_match('/\p{Lu}{4}/u', $__t) ? ' is-caps' : '') }}">{{ $decode($v->title) }}</strong>
+                                <small>{{ $platforms[$pfOf($v)]['label'] ?? '' }}@if ($v->published_at) · {{ $v->published_at->diffForHumans() }}@endif</small>
+                            </span>
+                        </a>
+                    @endforeach
+                @endif
+            </aside>
+        @endif
 
-                <h1 class="hero-fade hero-delay-1 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] mb-4 sm:mb-6 drop-shadow-lg">
-                    La Parole qui éclaire
-                </h1>
+        @if ($heroSlides->count() > 1)
+            <div class="hero-dots" role="group" aria-label="Images de fond">
+                @foreach ($heroSlides as $index => $slide)
+                    <button type="button" data-index="{{ $index }}" aria-current="{{ $index === 0 ? 'true' : 'false' }}" aria-label="Image {{ $index + 1 }}"></button>
+                @endforeach
+            </div>
+        @endif
+    </div>
+</section>
 
-                <p class="hero-fade hero-delay-2 text-base sm:text-lg md:text-xl text-slate-100/90 max-w-2xl mx-auto mb-8 sm:mb-10 leading-relaxed">
-                    Enseignements bibliques, témoignages et ressources spirituelles pour nourrir votre foi.
-                </p>
-
-                <div class="hero-fade hero-delay-3 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-                    <a href="{{ route('posts.index') }}"
-                       class="inline-flex items-center justify-center gap-2 bg-white text-blue-700 px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg font-semibold shadow-lg shadow-black/20 hover:bg-blue-50 transition duration-300 hover:-translate-y-0.5 text-sm sm:text-base">
-                        <i class="fas fa-play-circle"></i>
-                        Découvrir les enseignements
-                    </a>
-                    <a href="{{ route('contact.prayer') }}"
-                       class="inline-flex items-center justify-center gap-2 border border-white/70 bg-white/10 backdrop-blur-sm text-white px-6 sm:px-8 py-3 sm:py-3.5 rounded-lg font-semibold hover:bg-white/20 transition duration-300 hover:-translate-y-0.5 text-sm sm:text-base">
-                        <i class="fas fa-hands-praying"></i>
-                        Demande de prière
-                    </a>
-                </div>
+{{-- Flash info --}}
+@if ($latestPublications->isNotEmpty())
+    <div class="ticker" id="ticker" role="region" aria-label="Flash info">
+        <div class="ticker-label"><span class="dot" aria-hidden="true"></span>Flash info</div>
+        <div class="ticker-viewport">
+            <div class="ticker-track">
+                @foreach ([false, true] as $dup)
+                    <ul @if ($dup) aria-hidden="true" @endif>
+                        @foreach ($latestPublications as $item)
+                            <li>
+                                @if ($item->date)<time datetime="{{ $item->date->toDateString() }}">{{ $item->date->isToday() ? $item->date->format('H:i') : $item->date->translatedFormat('d M') }}</time>@endif
+                                <a href="{{ $item->url }}" @if ($dup) tabindex="-1" @endif>{{ $item->title }}</a>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endforeach
             </div>
         </div>
+        <button class="ticker-pause" type="button" id="tickerPause" aria-label="Mettre le défilement en pause"><i class="fa-solid fa-pause" aria-hidden="true"></i></button>
+    </div>
+@endif
 
-        @if($heroSlides->count() > 1)
-            <div class="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-10 flex gap-2.5 sm:gap-2" id="hero-dots" aria-label="Diapositives du carrousel">
-                @foreach($heroSlides as $index => $slide)
-                    <button type="button"
-                            class="hero-dot h-2.5 w-2.5 sm:h-2.5 sm:w-2.5 min-h-[11px] min-w-[11px] rounded-full {{ $index === 0 ? 'bg-white' : 'bg-white/40' }} transition-all duration-300 touch-manipulation p-1 box-content"
-                            data-index="{{ $index }}"
-                            aria-label="Image {{ $index + 1 }}"></button>
+<div class="sections">
+
+    {{-- Vidéos --}}
+    <section aria-labelledby="videosTitle">
+        <div class="wrap row-head">
+            <h2 id="videosTitle"><small>Sur toutes nos plateformes</small>À regarder</h2>
+            <a class="more" href="{{ route('videos.index') }}">Toutes les vidéos <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
+        </div>
+
+        @if ($latestVideos->isEmpty())
+            <div class="wrap">
+                <div class="empty">
+                    <i class="fa-solid fa-satellite-dish" aria-hidden="true"></i>
+                    <strong>Les premières vidéos arrivent.</strong>
+                    Elles apparaîtront ici dès leur publication sur nos réseaux.
+                </div>
+            </div>
+        @else
+            <div class="wrap sync" style="margin-bottom:22px">
+                <div class="filters" role="group" aria-label="Filtrer par plateforme" id="rowFilters">
+                    <button type="button" data-pf="all" aria-pressed="true">Tout <span class="count">{{ $latestVideos->count() }}</span></button>
+                    @foreach ($platforms as $key => $p)
+                        @if (collect($videosByPlatform[$key] ?? [])->isNotEmpty())
+                            <button type="button" data-pf="{{ $key }}" aria-pressed="false"><i class="fa-brands {{ $p['icon'] }}" aria-hidden="true"></i>{{ $p['label'] }}</button>
+                        @endif
+                    @endforeach
+                </div>
+                <p class="sync-status"><span class="ok" aria-hidden="true"></span>Mis à jour automatiquement depuis nos réseaux</p>
+            </div>
+
+            <div class="rows" id="videoRows">
+                <x-site.rail id="latest" title="Nouveautés" kicker="Vient de sortir" :href="route('videos.index')">
+                    @foreach ($latestVideos as $video)<x-site.video-card :video="$video" :vertical="false" />@endforeach
+                </x-site.rail>
+
+                @if ($mostViewed->count() >= 3)
+                    <x-site.rail id="popular" title="Les plus regardées" kicker="Tendances" :href="route('videos.index')">
+                        @foreach ($mostViewed as $video)<x-site.video-card :video="$video" :vertical="false" :stats="true" />@endforeach
+                    </x-site.rail>
+                @endif
+
+                @foreach (['youtube', 'facebook', 'x'] as $key)
+                    @php $items = collect($videosByPlatform[$key] ?? []); @endphp
+                    @if ($items->isNotEmpty())
+                        <x-site.rail :id="$key" :title="'Sur ' . $platforms[$key]['label']" kicker="Nos chaînes" :href="route('videos.index', ['platform' => $key])">
+                            @foreach ($items as $video)<x-site.video-card :video="$video" :vertical="false" :stats="true" />@endforeach
+                        </x-site.rail>
+                    @endif
                 @endforeach
+
+                @if ($shorts->isNotEmpty())
+                    <x-site.rail id="shorts" title="Shorts & Reels" kicker="Format court · Instagram · TikTok" :href="route('videos.index', ['platform' => 'tiktok'])" :vertical="true">
+                        @foreach ($shorts as $video)<x-site.video-card :video="$video" :vertical="true" />@endforeach
+                    </x-site.rail>
+                @endif
+                <p class="wrap empty" id="rowsEmpty" hidden>Aucune vidéo récente sur cette plateforme.</p>
             </div>
         @endif
     </section>
 
-    <style>
-        .hero-section {
-            /* svh/dvh : s'adapte à la barre d'adresse mobile */
-            min-height: 70vh;
-            min-height: 70svh;
-        }
-        @media (min-width: 640px) {
-            .hero-section {
-                min-height: 80vh;
-                min-height: 80svh;
-            }
-        }
-        @media (min-width: 768px) {
-            .hero-section {
-                min-height: 88vh;
-                min-height: 88svh;
-            }
-        }
-
-        @keyframes hero-zoom {
-            from { transform: scale(1.05); }
-            to { transform: scale(1.14); }
-        }
-        @keyframes hero-rise {
-            from { opacity: 0; transform: translateY(18px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .hero-bg {
-            background-size: cover;
-            background-position: center center;
-            background-repeat: no-repeat;
-            will-change: transform;
-        }
-
-        /* Desktop : zoom Ken Burns */
-        @media (min-width: 768px) {
-            .hero-bg {
-                inset: -2%;
-                width: 104%;
-                height: 104%;
-                animation: hero-zoom 18s ease-in-out infinite alternate;
-            }
-        }
-
-        /* Mobile : cadrage stable plein écran, sans zoom */
-        @media (max-width: 767px) {
-            .hero-bg {
-                inset: 0;
-                width: 100%;
-                height: 100%;
-                animation: none;
-                transform: none;
-            }
-        }
-
-        /* Préférence réduction de mouvement */
-        @media (prefers-reduced-motion: reduce) {
-            .hero-bg {
-                animation: none !important;
-                transform: none !important;
-            }
-        }
-
-        .hero-fade {
-            opacity: 0;
-            animation: hero-rise 0.9s ease-out forwards;
-        }
-        .hero-delay-1 { animation-delay: 0.15s; }
-        .hero-delay-2 { animation-delay: 0.3s; }
-        .hero-delay-3 { animation-delay: 0.45s; }
-        .hero-dot.is-active {
-            width: 1.75rem;
-            background-color: #fff;
-        }
-    </style>
-
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const slides = document.querySelectorAll('.hero-slide');
-            const dots = document.querySelectorAll('.hero-dot');
-            const carousel = document.getElementById('hero-carousel');
-            if (slides.length < 2) return;
-
-            let current = 0;
-            let timer;
-            let touchStartX = 0;
-            let touchEndX = 0;
-
-            function show(index) {
-                slides.forEach((slide, i) => {
-                    slide.classList.toggle('opacity-100', i === index);
-                    slide.classList.toggle('opacity-0', i !== index);
-                });
-                dots.forEach((dot, i) => {
-                    dot.classList.toggle('is-active', i === index);
-                    dot.classList.toggle('bg-white', i === index);
-                    dot.classList.toggle('bg-white/40', i !== index);
-                });
-                current = index;
-            }
-
-            function next() {
-                show((current + 1) % slides.length);
-            }
-
-            function prev() {
-                show((current - 1 + slides.length) % slides.length);
-            }
-
-            function start() {
-                clearInterval(timer);
-                timer = setInterval(next, 6500);
-            }
-
-            dots.forEach((dot) => {
-                dot.addEventListener('click', function () {
-                    show(Number(dot.dataset.index));
-                    start();
-                });
-            });
-
-            // Swipe tactile smartphones
-            if (carousel) {
-                carousel.addEventListener('touchstart', function (e) {
-                    touchStartX = e.changedTouches[0].screenX;
-                }, { passive: true });
-
-                carousel.addEventListener('touchend', function (e) {
-                    touchEndX = e.changedTouches[0].screenX;
-                    const delta = touchEndX - touchStartX;
-                    if (Math.abs(delta) < 40) return;
-                    if (delta < 0) next();
-                    else prev();
-                    start();
-                }, { passive: true });
-            }
-
-            show(0);
-            start();
-        });
-    </script>
-
-    <!-- Section Articles publiés -->
-    <section class="py-16 bg-slate-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
-                <div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-slate-900">
-                        <i class="fas fa-newspaper text-blue-600 mr-3"></i>Articles
-                    </h2>
-                    <p class="text-slate-500 mt-1">Les publications récentes de Hope Media RDC</p>
-                </div>
-                <div class="flex gap-2">
-                    <a href="{{ route('posts.index') }}"
-                       class="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                        Enseignements
-                    </a>
-                    <a href="{{ route('news.index') }}"
-                       class="inline-flex items-center gap-1.5 bg-white border text-slate-700 text-sm font-semibold px-4 py-2 rounded-lg hover:bg-slate-50 transition">
-                        Écho de la mission
-                    </a>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                @forelse($latestPublications ?? [] as $item)
-                    <div class="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-xl transition">
-                        <div class="relative h-48 bg-gradient-to-br from-slate-300 to-slate-400 overflow-hidden">
-                            @if($item->image)
-                                <img src="{{ asset($item->image) }}" alt="{{ $item->title }}" class="w-full h-full object-cover">
-                            @else
-                                <div class="w-full h-full flex items-center justify-center bg-blue-100">
-                                    <i class="fas fa-{{ $item->icon }} text-4xl text-blue-600 opacity-30"></i>
-                                </div>
-                            @endif
-                            <div class="absolute top-4 right-4 bg-white/90 rounded-full px-3 py-1 text-xs font-semibold text-slate-700">
-                                {{ $item->badge }}
-                            </div>
-                        </div>
-
-                        <div class="p-6">
-                            <h3 class="text-xl font-bold text-slate-900 mb-2 line-clamp-2 hover:text-blue-600 transition">
-                                <a href="{{ $item->url }}">{{ $item->title }}</a>
-                            </h3>
-
-                            <p class="text-slate-600 text-sm mb-4 line-clamp-3">{{ $item->excerpt }}</p>
-
-                            <div class="flex items-center justify-between text-xs text-slate-500 mb-4">
-                                <span><i class="fas fa-user mr-1"></i>{{ $item->author }}</span>
-                                <span><i class="fas fa-calendar mr-1"></i>{{ $item->date?->format('d/m/Y') }}</span>
-                            </div>
-
-                            <a href="{{ $item->url }}" class="text-blue-600 font-semibold hover:text-blue-700 transition">
-                                Lire plus <i class="fas fa-arrow-right ml-1"></i>
-                            </a>
-                        </div>
+    {{-- Enseignements --}}
+    @if ($teachings->isNotEmpty())
+        <x-site.rail id="teachings" title="Enseignements" kicker="À voir et à écouter" :href="route('posts.index')">
+            @foreach ($teachings as $item)
+                <a class="card" href="{{ $item->url }}">
+                    <div class="thumb">
+                        @if ($item->image)<img src="{{ asset($item->image) }}" alt="" loading="lazy" decoding="async">@else<x-site.art :seed="$item->title" :icon="$pubIcon($item->icon)" />@endif
+                        <span class="platform"><i class="fa-solid {{ $pubIcon($item->icon) }}" aria-hidden="true"></i></span>
+                        <span class="play" aria-hidden="true"><i class="fa-solid fa-play"></i></span>
+                        @if ($item->date && $item->date->gt(now()->subDays(7)))<span class="badges"><span class="chip gold">Nouveau</span></span>@endif
                     </div>
-                @empty
-                    <div class="col-span-full text-center py-12 text-slate-600">
-                        <p class="mb-4"><i class="fas fa-inbox text-4xl text-slate-400"></i></p>
-                        <p>Aucun article publié pour le moment.</p>
-                    </div>
-                @endforelse
-            </div>
-        </div>
-    </section>
-
-    {{-- SECTION : Flux Réseaux Sociaux --}}
-    @php
-        $latestVideos = $latestVideos ?? collect();
-        $videosByPlatform = $videosByPlatform ?? [
-            'youtube' => collect(),
-            'facebook' => collect(),
-            'instagram' => collect(),
-            'tiktok' => collect(),
-        ];
-        $allVideos = $latestVideos;
-        $platformGrids = [
-            'youtube'   => $videosByPlatform['youtube']   ?? collect(),
-            'facebook'  => $videosByPlatform['facebook']  ?? collect(),
-            'instagram' => $videosByPlatform['instagram'] ?? collect(),
-            'tiktok'    => $videosByPlatform['tiktok']    ?? collect(),
-        ];
-        $pfConfig = [
-            'youtube'   => ['badge' => 'bg-red-100 text-red-600',    'icon' => 'fa-youtube',   'overlay' => 'bg-red-900', 'tab' => 'bg-red-600'],
-            'facebook'  => ['badge' => 'bg-blue-100 text-blue-700',  'icon' => 'fa-facebook',  'overlay' => 'bg-blue-900', 'tab' => 'bg-blue-700'],
-            'instagram' => ['badge' => 'bg-pink-100 text-pink-600',  'icon' => 'fa-instagram', 'overlay' => 'bg-gradient-to-br from-purple-700 to-pink-600', 'tab' => 'bg-pink-600'],
-            'tiktok'    => ['badge' => 'bg-slate-100 text-slate-800','icon' => 'fa-tiktok',    'overlay' => 'bg-slate-900', 'tab' => 'bg-slate-900'],
-        ];
-    @endphp
-
-    <section class="py-16 bg-white" id="social-feed">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-
-            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
-                <div>
-                    <h2 class="text-3xl md:text-4xl font-bold text-slate-900">
-                        <i class="fas fa-play-circle text-red-500 mr-3"></i>Vidéos des réseaux sociaux
-                    </h2>
-                    <p class="text-slate-500 mt-1">YouTube, Facebook, Instagram et TikTok — synchronisés automatiquement.</p>
-                </div>
-                <a href="{{ route('videos.index') }}"
-                   class="inline-flex items-center gap-1.5 bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-                    Tout voir <i class="fas fa-arrow-right text-xs"></i>
+                    <h3>{{ $item->title }}</h3>
+                    <div class="meta"><span class="cat-tag c-0">{{ $item->badge }}</span><span>{{ $item->author }}</span></div>
                 </a>
-            </div>
+            @endforeach
+        </x-site.rail>
+    @endif
 
-            <div class="flex flex-wrap gap-2 mb-8" id="social-tabs">
-                <button type="button" class="social-tab-btn active px-4 py-2 rounded-full text-sm font-semibold transition bg-slate-800 text-white"
-                        data-tab="all">
-                    <i class="fa-solid fa-grid-2 mr-1"></i> Tout
-                    <span class="text-xs bg-white/20 px-1.5 py-0.5 rounded-full ml-1">{{ $allVideos->count() }}</span>
-                </button>
-                @foreach($platformGrids as $platform => $items)
-                <button type="button" class="social-tab-btn px-4 py-2 rounded-full text-sm font-semibold transition bg-white border text-slate-600 hover:bg-slate-50"
-                        data-tab="{{ $platform }}">
-                    <i class="fa-brands {{ $pfConfig[$platform]['icon'] }} mr-1"></i> {{ ucfirst($platform) }}
-                    <span class="text-xs {{ $pfConfig[$platform]['badge'] }} px-1.5 py-0.5 rounded-full ml-1">{{ $items->count() }}</span>
-                </button>
-                @endforeach
+    {{-- Écho de la mission --}}
+    @if ($mission->isNotEmpty())
+        <section class="wrap" aria-labelledby="missionTitle">
+            <div class="row-head">
+                <h2 id="missionTitle"><small>Actualités</small>Écho de la mission</h2>
+                <a class="more" href="{{ route('news.index') }}">Toutes les actualités <i class="fa-solid fa-chevron-right" aria-hidden="true"></i></a>
             </div>
-
-            <div class="social-grid" data-grid="all">
-                @if($allVideos->isEmpty())
-                    <div class="text-center py-16 text-slate-500 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                        <i class="fa-solid fa-satellite-dish text-5xl mb-3 opacity-30"></i>
-                        <p class="font-medium">Aucune vidéo synchronisée pour le moment.</p>
-                        <p class="text-sm mt-1">Synchronisez YouTube depuis l’admin → Sync Réseaux.</p>
+            @php $lead = $mission->first(); @endphp
+            <div class="mag" @if ($mission->count() === 1) style="grid-template-columns:minmax(0,1fr);max-width:860px" @endif>
+                <a class="story lead" href="{{ $lead->url }}">
+                    <div class="thumb">
+                        @if ($lead->image)<img src="{{ asset($lead->image) }}" alt="" loading="lazy" decoding="async">@else<x-site.art :seed="$lead->title" icon="fa-newspaper" />@endif
                     </div>
-                @else
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                        @foreach($allVideos as $video)
-                            @php
-                                $platformValue = is_object($video->platform) ? $video->platform->value : $video->platform;
-                                $vert = in_array($platformValue, ['tiktok','instagram'], true);
-                                $p = $pfConfig[$platformValue] ?? $pfConfig['youtube'];
-                            @endphp
-                            <a href="{{ route('videos.show', $video) }}"
-                               class="group bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-slate-100">
-                                <div class="relative w-full {{ $vert ? 'aspect-[9/16]' : 'aspect-video' }} bg-slate-900 overflow-hidden flex-shrink-0">
-                                    @if($video->thumbnail_url)
-                                        <img src="{{ $video->thumbnail_url }}" alt="{{ e($video->title) }}"
-                                             class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">
-                                    @else
-                                        <div class="absolute inset-0 {{ $p['overlay'] }} flex items-center justify-center">
-                                            <i class="fa-brands {{ $p['icon'] }} text-white text-4xl opacity-40"></i>
-                                        </div>
-                                    @endif
-                                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
-                                        <div class="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 shadow-lg">
-                                            <i class="fa-solid fa-play text-slate-800 text-base ml-1"></i>
-                                        </div>
-                                    </div>
-                                    <span class="absolute top-2 left-2 text-xs font-bold {{ $p['badge'] }} rounded-full px-2 py-0.5 shadow-sm">
-                                        <i class="fa-brands {{ $p['icon'] }} mr-0.5"></i>{{ ucfirst($platformValue) }}
-                                    </span>
+                    <div class="meta">
+                        <span class="cat-tag c-1">{{ $lead->badge }}</span>
+                        @if ($lead->date)<time datetime="{{ $lead->date->toDateString() }}">{{ $lead->date->diffForHumans() }}</time>@endif
+                    </div>
+                    <h3>{{ $lead->title }}</h3>
+                    @if ($lead->excerpt)<p>{{ $lead->excerpt }}</p>@endif
+                </a>
+                @if ($mission->count() > 1)
+                    <div class="mag-side">
+                        @foreach ($mission->slice(1, 4) as $item)
+                            <a class="story" href="{{ $item->url }}">
+                                <div class="thumb">
+                                    @if ($item->image)<img src="{{ asset($item->image) }}" alt="" loading="lazy" decoding="async">@else<x-site.art :seed="$item->title" icon="fa-newspaper" />@endif
                                 </div>
-                                <div class="p-3 flex-1 flex flex-col gap-1">
-                                    <p class="text-sm font-semibold text-slate-800 line-clamp-2 group-hover:text-blue-600 transition leading-snug">{{ $video->title }}</p>
-                                    @if($video->published_at)
-                                        <p class="text-xs text-slate-400 mt-auto">{{ $video->published_at->diffForHumans() }}</p>
-                                    @endif
+                                <div>
+                                    <div class="meta"><span class="cat-tag c-1">{{ $item->badge }}</span>@if ($item->date)<time datetime="{{ $item->date->toDateString() }}">{{ $item->date->diffForHumans() }}</time>@endif</div>
+                                    <h3>{{ $item->title }}</h3>
                                 </div>
                             </a>
                         @endforeach
                     </div>
                 @endif
             </div>
+        </section>
+    @endif
 
-            @foreach($platformGrids as $platform => $items)
-                <div class="social-grid hidden" data-grid="{{ $platform }}">
-                    @if($items->isEmpty())
-                        <div class="text-center py-16 text-slate-400 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                            <i class="fa-brands {{ $pfConfig[$platform]['icon'] }} text-5xl mb-3 opacity-30"></i>
-                            <p>Aucun contenu {{ ucfirst($platform) }} synchronisé pour le moment.</p>
-                        </div>
-                    @else
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-                            @foreach($items as $video)
-                                @php $vert = in_array($platform, ['tiktok','instagram'], true); $p = $pfConfig[$platform]; @endphp
-                                <a href="{{ route('videos.show', $video) }}"
-                                   class="group bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col hover:shadow-lg transition-all duration-300 hover:-translate-y-1 border border-slate-100">
-                                    <div class="relative w-full {{ $vert ? 'aspect-[9/16]' : 'aspect-video' }} bg-slate-900 overflow-hidden flex-shrink-0">
-                                        @if($video->thumbnail_url)
-                                            <img src="{{ $video->thumbnail_url }}" alt="{{ e($video->title) }}"
-                                                 class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy">
-                                        @else
-                                            <div class="absolute inset-0 {{ $p['overlay'] }} flex items-center justify-center">
-                                                <i class="fa-brands {{ $p['icon'] }} text-white text-4xl opacity-40"></i>
-                                            </div>
-                                        @endif
-                                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center">
-                                            <div class="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 shadow-lg">
-                                                <i class="fa-solid fa-play text-slate-800 text-base ml-1"></i>
-                                            </div>
-                                        </div>
-                                        <span class="absolute top-2 left-2 text-xs font-bold {{ $p['badge'] }} rounded-full px-2 py-0.5 shadow-sm">
-                                            <i class="fa-brands {{ $p['icon'] }} mr-0.5"></i>{{ ucfirst($platform) }}
-                                        </span>
-                                    </div>
-                                    <div class="p-3 flex-1 flex flex-col gap-1">
-                                        <p class="text-sm font-semibold text-slate-800 line-clamp-2 group-hover:text-blue-600 transition leading-snug">{{ $video->title }}</p>
-                                        <div class="flex items-center gap-3 mt-auto text-xs text-slate-400">
-                                            @if($video->view_count) <span><i class="fa-regular fa-eye mr-0.5"></i>{{ number_format($video->view_count) }}</span> @endif
-                                            @if($video->likes_count) <span><i class="fa-regular fa-heart mr-0.5"></i>{{ number_format($video->likes_count) }}</span> @endif
-                                            @if($video->published_at) <span class="ml-auto">{{ $video->published_at->diffForHumans() }}</span> @endif
-                                        </div>
-                                    </div>
-                                </a>
-                            @endforeach
-                        </div>
-                    @endif
+    {{-- Ligne de prière --}}
+    <section class="wrap" aria-labelledby="prayTitle">
+        <div class="prayer">
+            <x-site.art theme="t-dawn" icon="fa-hands-praying" style="--gx:80%;--gy:10%" />
+            <div class="prayer-in">
+                <span class="hero-slogan" style="font-size:.95rem">Ligne de prière</span>
+                <h2 id="prayTitle">On prie avec vous</h2>
+                <p>Envoyez votre sujet de prière à l'équipe d'intercession de Hope Media, en toute confidentialité.</p>
+                <p class="verse">« Déchargez-vous sur lui de tous vos soucis, car lui-même prend soin de vous. » — 1 Pierre 5:7</p>
+                <div class="prayer-cta">
+                    <a class="btn btn-gold" href="{{ route('contact.prayer') }}"><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Envoyer un sujet de prière</a>
+                    <a class="btn btn-ghost" href="{{ route('contact.create') }}"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Écrire à la rédaction</a>
                 </div>
-            @endforeach
-
-        </div>
-    </section>
-
-    <script>
-    (function () {
-        const tabs  = document.querySelectorAll('.social-tab-btn');
-        const grids = document.querySelectorAll('.social-grid');
-
-        tabs.forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                const target = btn.dataset.tab;
-
-                tabs.forEach(function (t) {
-                    t.classList.remove('active', 'bg-slate-800', 'text-white', 'bg-red-600', 'bg-blue-700', 'bg-pink-600', 'bg-slate-900');
-                    t.classList.add('bg-white', 'border', 'text-slate-600');
-                });
-                btn.classList.remove('bg-white', 'border', 'text-slate-600');
-                btn.classList.add('active');
-                if (target === 'youtube') btn.classList.add('bg-red-600', 'text-white');
-                else if (target === 'facebook') btn.classList.add('bg-blue-700', 'text-white');
-                else if (target === 'instagram') btn.classList.add('bg-pink-600', 'text-white');
-                else if (target === 'tiktok') btn.classList.add('bg-slate-900', 'text-white');
-                else btn.classList.add('bg-slate-800', 'text-white');
-
-                grids.forEach(function (g) {
-                    g.classList.toggle('hidden', g.dataset.grid !== target);
-                });
-            });
-        });
-    }());
-    </script>
-
-    <!-- Section CTA Appel à l'action -->
-    <section class="py-16 bg-gradient-to-r from-blue-600 to-blue-800 text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 class="text-3xl md:text-4xl font-bold mb-4">Avez-vous besoin de soutien spirituel?</h2>
-            <p class="text-lg text-blue-100 mb-8 max-w-2xl mx-auto">
-                Nos pasteurs et membres sont là pour vous accompagner dans votre cheminement spirituel.
-            </p>
-            <div class="flex flex-col md:flex-row gap-4 justify-center">
-                <a href="{{ route('contact.prayer') }}" class="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-blue-50 transition">
-                    <i class="fas fa-pray mr-2"></i>
-                    Soumettre une demande de prière
-                </a>
-                <a href="{{ route('contact.create') }}" class="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:bg-opacity-10 transition">
-                    <i class="fas fa-envelope mr-2"></i>
-                    Nous contacter
-                </a>
             </div>
         </div>
     </section>
-
-    <!-- Section Newsletter -->
-    <section class="py-14 bg-gradient-to-r from-blue-700 to-blue-900 text-white">
-        <div class="max-w-3xl mx-auto px-4 text-center">
-            <h2 class="text-2xl md:text-3xl font-bold mb-3">
-                <i class="fas fa-bell mr-2"></i>Abonnez-vous à notre newsletter
-            </h2>
-            <p class="text-blue-100 mb-6">Recevez les derniers Échos de la mission directement dans votre boîte mail.</p>
-
-            @if(session('newsletter_success'))
-                <div class="mb-4 bg-green-500 text-white px-4 py-3 rounded-lg inline-block">
-                    <i class="fas fa-check-circle mr-2"></i>{{ session('newsletter_success') }}
-                </div>
-            @elseif(session('newsletter_info'))
-                <div class="mb-4 bg-yellow-400 text-white px-4 py-3 rounded-lg inline-block">
-                    <i class="fas fa-info-circle mr-2"></i>{{ session('newsletter_info') }}
-                </div>
-            @endif
-
-            <form action="{{ route('newsletter.subscribe') }}" method="POST"
-                  class="flex flex-col sm:flex-row gap-3 max-w-lg mx-auto">
-                @csrf
-                <input type="text" name="name" placeholder="Votre prénom"
-                       class="flex-1 px-4 py-3 rounded-lg text-slate-900 focus:outline-none">
-                <input type="email" name="email" required placeholder="Votre adresse e-mail"
-                       class="flex-1 px-4 py-3 rounded-lg text-slate-900 focus:outline-none">
-                <button type="submit"
-                        class="bg-white text-blue-700 font-bold px-6 py-3 rounded-lg hover:bg-blue-50 transition whitespace-nowrap">
-                    <i class="fas fa-paper-plane mr-2"></i>S'abonner
-                </button>
-            </form>
-            @error('email')
-                <p class="text-red-300 text-sm mt-2">{{ $message }}</p>
-            @enderror
-        </div>
-    </section>
+</div>
 @endsection

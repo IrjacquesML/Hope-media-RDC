@@ -84,7 +84,7 @@
             <!-- URL Vidéo -->
             <div id="video-content" class="content-field hidden space-y-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div class="flex gap-4 mb-4">
+                    <div class="flex flex-wrap gap-4 mb-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="video_source" value="url" checked onchange="toggleVideoSource('url')" class="w-4 h-4">
                             <span class="font-medium">URL de la vidéo</span>
@@ -131,7 +131,7 @@
             <!-- URL Image -->
             <div id="image-content" class="content-field hidden space-y-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div class="flex gap-4 mb-4">
+                    <div class="flex flex-wrap gap-4 mb-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="image_source" value="url" checked onchange="toggleImageSource('url')" class="w-4 h-4">
                             <span class="font-medium">URL de l'image</span>
@@ -172,7 +172,7 @@
             <!-- URL Audio -->
             <div id="audio-content" class="content-field hidden space-y-4">
                 <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div class="flex gap-4 mb-4">
+                    <div class="flex flex-wrap gap-4 mb-4">
                         <label class="flex items-center gap-2 cursor-pointer">
                             <input type="radio" name="audio_source" value="url" checked onchange="toggleAudioSource('url')" class="w-4 h-4">
                             <span class="font-medium">URL de l'audio</span>

@@ -16,6 +16,14 @@
 /public/build
 /public/hot
 /public/storage
+# Fichiers envoyés depuis l'admin : ils vivent sur le serveur, jamais dans Git
+# (les fichiers déjà suivis dans ces dossiers restent suivis)
+/public/images/posts/*
+/public/images/news/*
+/public/images/hero/*
+/public/images/resources/*
+# Sauvegardes locales éventuelles
+/storage/backups
 /storage/*.key
 /storage/pail
 /vendor

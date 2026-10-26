@@ -77,6 +77,29 @@ final class YouTubeApiService
         return $synced;
     }
 
+    /**
+     * Vérifie la clé API et la chaîne, sans rien enregistrer.
+     *
+     * @return string Nom de la chaîne trouvée.
+     */
+    public function testConnection(): string
+    {
+        $params = ['part' => 'snippet'];
+        if (str_starts_with($this->channelId, '@')) {
+            $params['forHandle'] = ltrim($this->channelId, '@');
+        } else {
+            $params['id'] = $this->channelId;
+        }
+
+        $title = $this->get('/channels', $params)['items'][0]['snippet']['title'] ?? null;
+
+        if (! $title) {
+            throw new \RuntimeException("Chaîne YouTube introuvable : « {$this->channelId} ». Vérifiez le @nom ou l'identifiant UC….");
+        }
+
+        return $title;
+    }
+
     // -------------------------------------------------------------------------
     // Méthodes privées — appels API
     // -------------------------------------------------------------------------
