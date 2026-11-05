@@ -11,6 +11,8 @@
 #   4. récupère le nouveau code (git pull --ff-only : jamais de reset ni de clean)
 #   5. installe les dépendances PHP
 #   6. applique UNIQUEMENT les nouvelles migrations (migrate --force)
+#      puis supprime les données de test (content:purge-test : titres « TEST »,
+#      commentaires d'exemple, e-mails fictifs ; le contenu réel n'est pas touché)
 #   7. vide et reconstruit les caches, puis remet le site en ligne
 #
 # Il ne lance jamais migrate:fresh / migrate:refresh / db:seed / git reset / git clean.
@@ -51,6 +53,7 @@ composer install --no-dev --optimize-autoloader --no-interaction
 
 echo "== 6/7 Nouvelles migrations (les données existantes sont conservées)"
 php artisan migrate --force
+php artisan content:purge-test --force
 
 echo "== 7/7 Caches et remise en ligne"
 php artisan storage:link >/dev/null 2>&1 || true

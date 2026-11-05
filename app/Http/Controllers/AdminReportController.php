@@ -8,6 +8,7 @@ use App\Models\News;
 use App\Models\NewsletterSubscription;
 use App\Models\Post;
 use App\Models\Resource;
+use App\Models\SocialFeed;
 use App\Models\Video;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -30,6 +31,7 @@ class AdminReportController extends Controller
         'news'       => 'Écho de la mission',
         'posts'      => 'Enseignements',
         'videos'     => 'Vidéos',
+        'social'     => 'Réseaux sociaux',
         'resources'  => 'Ressources',
         'engagement' => 'Engagement et commentaires',
         'contacts'   => 'Messages et demandes de prière',
@@ -147,6 +149,7 @@ class AdminReportController extends Controller
             $items = (clone $q)->withCount('comments')->orderBy('published_at')->limit(self::MAX_ROWS)->get();
             $out['news'] = [
                 'count'      => (clone $q)->count(),
+                'comments'   => $this->commentsOn(News::class, $q),
                 'views'      => (int) (clone $q)->sum('views'),
                 'likes'      => (int) (clone $q)->sum('likes'),
                 'drafts'     => News::where('status', 'draft')->tap(fn ($b) => $inPeriod($b))->count(),
@@ -161,6 +164,7 @@ class AdminReportController extends Controller
             $q = Post::query()->where('posts.status', 'published')->tap($published);
             $out['posts'] = [
                 'count'      => (clone $q)->count(),
+                'comments'   => $this->commentsOn(Post::class, $q),
                 'views'      => (int) (clone $q)->sum('views'),
                 'likes'      => (int) (clone $q)->sum('likes'),
                 'items'      => (clone $q)->with('category')->withCount('comments')->orderBy('published_at')->limit(self::MAX_ROWS)->get(),
@@ -182,6 +186,23 @@ class AdminReportController extends Controller
                 'byPlatform' => (clone $q)->selectRaw('platform as label, COUNT(*) as total, SUM(view_count) as views')->groupBy('platform')->orderByDesc('total')->get(),
             ];
             $out['summary'][] = ['Vidéos publiées', $out['videos']['count']];
+        }
+
+        if (in_array('social', $sections)) {
+            // Toutes les publications synchronisées depuis les réseaux (vidéos, photos, textes…)
+            $q = SocialFeed::query()->tap($published);
+            $out['social'] = [
+                'count'      => (clone $q)->count(),
+                'views'      => (int) (clone $q)->sum('view_count'),
+                'likes'      => (int) (clone $q)->sum('likes_count'),
+                'comments'   => (int) (clone $q)->sum('comments_count'),
+                'shares'     => (int) (clone $q)->sum('shares_count'),
+                'items'      => (clone $q)->orderBy('published_at')->limit(self::MAX_ROWS)->get(),
+                'byPlatform' => (clone $q)->selectRaw('platform as label, COUNT(*) as total, SUM(view_count) as views, SUM(likes_count) as likes, SUM(comments_count) as comments, SUM(shares_count) as shares')
+                                    ->groupBy('platform')->orderByDesc('total')->get(),
+                'byType'     => (clone $q)->selectRaw('media_type as label, COUNT(*) as total')->groupBy('media_type')->orderByDesc('total')->get(),
+            ];
+            $out['summary'][] = ['Publications sur les réseaux sociaux', $out['social']['count']];
         }
 
         if (in_array('resources', $sections)) {
@@ -235,7 +256,77 @@ class AdminReportController extends Controller
             $out['summary'][] = ['Nouveaux abonnés à la newsletter', $out['newsletter']['new']];
         }
 
+        $out['totals'] = $this->totals($out);
+
         return $out;
+    }
+
+    /**
+     * Récapitulatif chiffré de toutes les sections : une ligne par domaine et un total général.
+     * Les vidéos font aussi partie des publications des réseaux sociaux : quand les deux
+     * sections sont incluses, la ligne « Vidéos » est affichée mais n'entre pas dans le total.
+     */
+    private function totals(array $out): array
+    {
+        $rows = [];
+        $add = function (string $label, array $values, bool $inTotal = true) use (&$rows) {
+            $rows[] = ['label' => $label, 'inTotal' => $inTotal] + $values + [
+                'items' => 0, 'views' => null, 'likes' => null, 'comments' => null, 'other' => null,
+            ];
+        };
+
+        if (isset($out['news'])) {
+            $add('Écho de la mission (articles)', ['items' => $out['news']['count'], 'views' => $out['news']['views'], 'likes' => $out['news']['likes'], 'comments' => $out['news']['comments']]);
+        }
+        if (isset($out['posts'])) {
+            $add('Enseignements', ['items' => $out['posts']['count'], 'views' => $out['posts']['views'], 'likes' => $out['posts']['likes'], 'comments' => $out['posts']['comments']]);
+        }
+        if (isset($out['videos'])) {
+            $add('Vidéos', ['items' => $out['videos']['count'], 'views' => $out['videos']['views'], 'likes' => $out['videos']['likes'], 'comments' => $out['videos']['comments']], !isset($out['social']));
+        }
+        if (isset($out['social'])) {
+            $add('Réseaux sociaux (toutes publications)', ['items' => $out['social']['count'], 'views' => $out['social']['views'], 'likes' => $out['social']['likes'], 'comments' => $out['social']['comments'], 'other' => $out['social']['shares']]);
+        }
+        if (isset($out['resources'])) {
+            $add('Ressources', ['items' => $out['resources']['count'], 'other' => $out['resources']['downloads']]);
+        }
+
+        $counted = array_filter($rows, fn ($r) => $r['inTotal']);
+        $sum = fn (string $k) => array_sum(array_map(fn ($r) => (int) $r[$k], $counted));
+
+        $audience = [];
+        if (isset($out['engagement'])) {
+            $audience[] = ['Commentaires reçus sur le site', $out['engagement']['total']];
+        }
+        if (isset($out['contacts'])) {
+            $audience[] = ['Messages et demandes de prière', $out['contacts']['total']];
+        }
+        if (isset($out['newsletter'])) {
+            $audience[] = ['Nouveaux abonnés à la newsletter', $out['newsletter']['new']];
+        }
+
+        return [
+            'rows'           => $rows,
+            'total'          => [
+                'items'    => $sum('items'),
+                'views'    => $sum('views'),
+                'likes'    => $sum('likes'),
+                'comments' => $sum('comments'),
+                'other'    => $sum('other'),
+            ],
+            'excludesVideos' => isset($out['videos'], $out['social']),
+            'audience'       => $audience,
+            'audienceTotal'  => array_sum(array_column($audience, 1)),
+        ];
+    }
+
+    /** Commentaires du public sur les contenus sélectionnés (sans limite de lignes). */
+    private function commentsOn(string $type, Builder $contents): int
+    {
+        return Comment::where('commentable_type', $type)
+            ->where('is_admin_reply', false)
+            ->whereIn('commentable_id', (clone $contents)->select($contents->getModel()->getTable() . '.id'))
+            ->count();
     }
 
     /**
@@ -292,7 +383,8 @@ class AdminReportController extends Controller
             'prayer' => 'Demande de prière', 'question' => 'Question', 'testimony' => 'Témoignage',
             'contact' => 'Contact', 'feedback' => 'Avis',
             'new' => 'Nouveau', 'read' => 'Lu', 'replied' => 'Répondu', 'archived' => 'Archivé',
-            'youtube' => 'YouTube', 'facebook' => 'Facebook', 'tiktok' => 'TikTok', 'instagram' => 'Instagram',
+            'youtube' => 'YouTube', 'facebook' => 'Facebook', 'tiktok' => 'TikTok', 'instagram' => 'Instagram', 'x' => 'X',
+            'carousel' => 'Carrousel', 'short' => 'Short', 'reel' => 'Reel', 'link' => 'Lien',
         ][$value] ?? Str::ucfirst((string) $value);
     }
 }

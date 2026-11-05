@@ -77,7 +77,9 @@ cd /chemin/du/site
 bash scripts/deploy.sh
 ```
 
-Le script sauvegarde tout, met le site en maintenance, récupère le code, applique uniquement les **nouvelles** migrations (les données existantes restent), reconstruit les caches et remet le site en ligne. En cas d'erreur, il remet le site en ligne et n'efface rien.
+Le script sauvegarde tout, met le site en maintenance, récupère le code, applique uniquement les **nouvelles** migrations (les données existantes restent), reconstruit les caches et remet le site en ligne.
+
+Il supprime aussi les **données de test** (`php artisan content:purge-test --force`) : articles, enseignements, ressources ou vidéos intitulés seulement « TEST », « essai », « démo »…, leurs commentaires, les commentaires d'exemple et les e-mails fictifs (`@example.com`, `.test`…). Le contenu réel n'est pas touché, et la sauvegarde faite juste avant permet de revenir en arrière. Pour voir ce qui serait supprimé sans rien effacer : `php artisan content:purge-test`. En cas d'erreur, il remet le site en ligne et n'efface rien.
 
 S'il refuse de démarrer parce que « des fichiers du code ont été modifiés directement sur le serveur », c'est une protection : ne modifiez pas le code sur le VPS, faites-le sur votre PC puis envoyez-le avec Git.
 

@@ -119,6 +119,37 @@
             @for ($i = count($row); $i < 4; $i++)<td style="border:0"></td>@endfor
         </tr></table>
     @endforeach
+    @php $opt = fn ($n) => $n === null ? '—' : $fmt($n); @endphp
+    @if (!empty($totals['rows']))
+        <h3>Récapitulatif des totaux</h3>
+        <table class="data">
+            <thead><tr><th>Domaine</th><th class="r">Publications</th><th class="r">Vues</th><th class="r">J'aime</th><th class="r">Commentaires</th><th class="r">Partages / téléch.</th></tr></thead>
+            <tbody>
+            @foreach ($totals['rows'] as $row)
+                <tr>
+                    <td>{{ $row['label'] }}@unless ($row['inTotal'])<span class="small muted"> (déjà comptées dans les réseaux sociaux)</span>@endunless</td>
+                    <td class="r">{{ $fmt($row['items']) }}</td><td class="r">{{ $opt($row['views']) }}</td><td class="r">{{ $opt($row['likes']) }}</td>
+                    <td class="r">{{ $opt($row['comments']) }}</td><td class="r">{{ $opt($row['other']) }}</td>
+                </tr>
+            @endforeach
+            </tbody>
+            <tfoot><tr>
+                <td>TOTAL GÉNÉRAL</td>
+                <td class="r">{{ $fmt($totals['total']['items']) }}</td><td class="r">{{ $fmt($totals['total']['views']) }}</td><td class="r">{{ $fmt($totals['total']['likes']) }}</td>
+                <td class="r">{{ $fmt($totals['total']['comments']) }}</td><td class="r">{{ $fmt($totals['total']['other']) }}</td>
+            </tr></tfoot>
+        </table>
+    @endif
+    @if (!empty($totals['audience']))
+        <h3>Interactions directes du public</h3>
+        <table class="data">
+            <thead><tr><th>Type</th><th class="r">Nombre</th></tr></thead>
+            <tbody>
+            @foreach ($totals['audience'] as [$label, $value])<tr><td>{{ $label }}</td><td class="r">{{ $fmt($value) }}</td></tr>@endforeach
+            </tbody>
+            <tfoot><tr><td>TOTAL</td><td class="r">{{ $fmt($totals['audienceTotal']) }}</td></tr></tfoot>
+        </table>
+    @endif
     <p class="note">Les contenus sont comptés selon leur date de publication ; les commentaires, messages et abonnements selon leur date de réception. Les vues et « j'aime » sont les totaux cumulés à la date d'émission pour les contenus publiés pendant la période.</p>
 
     {{-- Écho de la mission --}}
@@ -158,7 +189,7 @@
                     </tr>
                 @endforeach
                 </tbody>
-                <tfoot><tr><td colspan="5">Total ({{ $fmt($news['count']) }} articles)</td><td class="r">{{ $fmt($news['views']) }}</td><td class="r">{{ $fmt($news['likes']) }}</td><td class="r">{{ $fmt($news['items']->sum('comments_count')) }}</td></tr></tfoot>
+                <tfoot><tr><td colspan="5">Total ({{ $fmt($news['count']) }} articles)</td><td class="r">{{ $fmt($news['views']) }}</td><td class="r">{{ $fmt($news['likes']) }}</td><td class="r">{{ $fmt($news['comments']) }}</td></tr></tfoot>
             </table>
             @if ($news['count'] > $maxRows)<p class="note">Seuls les {{ $maxRows }} premiers articles sont détaillés ; les totaux portent sur l'ensemble.</p>@endif
         @endif
@@ -171,7 +202,7 @@
             <td><div class="v">{{ $fmt($posts['count']) }}</div><div class="l">Enseignements publiés</div></td>
             <td><div class="v">{{ $fmt($posts['views']) }}</div><div class="l">Vues</div></td>
             <td><div class="v">{{ $fmt($posts['likes']) }}</div><div class="l">J'aime</div></td>
-            <td><div class="v">{{ $fmt($posts['items']->sum('comments_count')) }}</div><div class="l">Commentaires</div></td>
+            <td><div class="v">{{ $fmt($posts['comments']) }}</div><div class="l">Commentaires</div></td>
         </tr></table>
 
         @if ($posts['byType']->isNotEmpty() || $posts['byCategory']->isNotEmpty())
@@ -255,6 +286,51 @@
         @endif
     @endisset
 
+    {{-- Réseaux sociaux --}}
+    @isset($social)
+        <h2>{{ ++$num }}. Réseaux sociaux</h2>
+        <table class="kpi"><tr>
+            <td><div class="v">{{ $fmt($social['count']) }}</div><div class="l">Publications</div></td>
+            <td><div class="v">{{ $fmt($social['views']) }}</div><div class="l">Vues</div></td>
+            <td><div class="v">{{ $fmt($social['likes']) }}</div><div class="l">J'aime</div></td>
+            <td><div class="v">{{ $fmt($social['comments'] + $social['shares']) }}</div><div class="l">Commentaires et partages</div></td>
+        </tr></table>
+
+        @if ($social['byPlatform']->isNotEmpty())
+            <h3>Répartition par réseau</h3>
+            <table class="data">
+                <thead><tr><th>Réseau</th><th class="r">Publications</th><th class="r">Vues</th><th class="r">J'aime</th><th class="r">Com.</th><th class="r">Partages</th></tr></thead>
+                <tbody>
+                @foreach ($social['byPlatform'] as $pl)
+                    <tr><td>{{ R::label($pl->label) }}</td><td class="r">{{ $fmt($pl->total) }}</td><td class="r">{{ $fmt($pl->views) }}</td><td class="r">{{ $fmt($pl->likes) }}</td><td class="r">{{ $fmt($pl->comments) }}</td><td class="r">{{ $fmt($pl->shares) }}</td></tr>
+                @endforeach
+                </tbody>
+                <tfoot><tr><td>Total</td><td class="r">{{ $fmt($social['count']) }}</td><td class="r">{{ $fmt($social['views']) }}</td><td class="r">{{ $fmt($social['likes']) }}</td><td class="r">{{ $fmt($social['comments']) }}</td><td class="r">{{ $fmt($social['shares']) }}</td></tr></tfoot>
+            </table>
+            <p class="small muted">Par format : {{ $social['byType']->map(fn ($t) => R::label($t->label) . ' ' . $fmt($t->total))->implode(' · ') }}</p>
+        @endif
+
+        <h3>Liste des publications</h3>
+        @if ($social['items']->isEmpty())
+            <p class="empty">Aucune publication synchronisée sur la période. Vérifiez la synchronisation dans Admin → Réseaux sociaux.</p>
+        @else
+            <table class="data">
+                <thead><tr><th style="width:18px">#</th><th style="width:58px">Date</th><th>Publication</th><th>Réseau</th><th class="r">Vues</th><th class="r">J'aime</th><th class="r">Com.</th></tr></thead>
+                <tbody>
+                @foreach ($social['items'] as $i => $f)
+                    <tr>
+                        <td>{{ $i + 1 }}</td><td>{{ $d($f->published_at ?? $f->created_at) }}</td>
+                        <td>{{ Str::limit(R::clean($f->title ?: $f->body) ?: '(sans texte)', 90) }}</td><td>{{ R::label($f->platform) }}</td>
+                        <td class="r">{{ $fmt($f->view_count) }}</td><td class="r">{{ $fmt($f->likes_count) }}</td><td class="r">{{ $fmt($f->comments_count) }}</td>
+                    </tr>
+                @endforeach
+                </tbody>
+            </table>
+            @if ($social['count'] > $maxRows)<p class="note">Seules les {{ $maxRows }} premières publications sont détaillées ; les totaux portent sur l'ensemble.</p>@endif
+            <p class="note">Statistiques issues de la dernière synchronisation avec chaque réseau.</p>
+        @endif
+    @endisset
+
     {{-- Ressources --}}
     @isset($resources)
         <h2>{{ ++$num }}. Ressources</h2>
@@ -273,6 +349,7 @@
                     <tr><td>{{ $i + 1 }}</td><td>{{ $d($r->published_at ?? $r->created_at) }}</td><td>{{ R::clean($r->title) }}</td><td>{{ $r->author ?: '—' }}</td><td>{{ $r->category ?: '—' }}</td><td class="r">{{ $fmt($r->downloads) }}</td></tr>
                 @endforeach
                 </tbody>
+                <tfoot><tr><td colspan="5">Total ({{ $fmt($resources['count']) }} ressources)</td><td class="r">{{ $fmt($resources['downloads']) }}</td></tr></tfoot>
             </table>
         @endif
     @endisset
