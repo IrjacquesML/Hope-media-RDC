@@ -94,6 +94,27 @@
                                     </div>
                                     @break
 
+                                @case('select')
+                                    <select id="f-{{ $key }}" name="{{ $key }}" class="{{ $input }} text-sm bg-white @error($key) border-red-500 @enderror">
+                                        @foreach ($f['options'] as $optValue => $optLabel)
+                                            <option value="{{ $optValue }}" @selected((string) old($key, $f['value']) === (string) $optValue)>{{ $optLabel }}</option>
+                                        @endforeach
+                                    </select>
+                                    @break
+
+                                @case('secret')
+                                    {{-- La valeur enregistrée n'est jamais renvoyée dans la page --}}
+                                    <input id="f-{{ $key }}" type="password" name="{{ $key }}" value="" autocomplete="new-password" spellcheck="false"
+                                           placeholder="{{ $f['value'] ? '•••••••• enregistrée — laisser vide pour la conserver' : 'Collez la clé ici' }}"
+                                           class="{{ $input }} text-sm font-mono @error($key) border-red-500 @enderror">
+                                    @if ($f['value'])
+                                        <div class="flex flex-wrap gap-x-4 mt-1 text-xs">
+                                            <span class="text-green-700"><i class="fas fa-lock mr-1"></i>Enregistrée (chiffrée)</span>
+                                            <label class="inline-flex items-center gap-1 text-slate-600 cursor-pointer"><input type="checkbox" name="{{ $key }}_default" value="1"> Effacer</label>
+                                        </div>
+                                    @endif
+                                    @break
+
                                 @default
                                     <input id="f-{{ $key }}" type="{{ in_array($f['type'], ['url', 'email', 'tel']) ? $f['type'] : 'text' }}" name="{{ $key }}"
                                            value="{{ old($key, $f['value']) }}" @if (!empty($f['required'])) required @endif placeholder="{{ $f['placeholder'] ?? ($f['type'] === 'url' ? 'https://' : '') }}"
@@ -101,10 +122,10 @@
                             @endswitch
 
                             @isset($f['help'])<p class="text-xs text-slate-500 mt-1">{{ $f['help'] }}</p>@endisset
-                            @if ($f['type'] !== 'boolean' && $f['type'] !== 'image' && empty($f['required']))
+                            @if (! in_array($f['type'], ['boolean', 'image', 'select', 'secret']) && empty($f['required']) && ! in_array($tab, ['mail', 'newsletter']))
                                 <p class="text-xs text-slate-400 mt-1">Laissez vide pour masquer cet élément sur le site.</p>
                             @endif
-                            @if ($f['type'] !== 'boolean' && $f['type'] !== 'image' && $f['default'] && $f['custom'])
+                            @if (! in_array($f['type'], ['boolean', 'image', 'secret']) && $f['default'] && $f['custom'])
                                 <label class="inline-flex items-start gap-1.5 text-xs text-slate-600 mt-1 cursor-pointer">
                                     <input type="checkbox" name="{{ $key }}_default" value="1" class="mt-0.5">
                                     <span>Rétablir la valeur d’origine : « {{ \Illuminate\Support\Str::limit(str_replace("\n", ' / ', $f['default']), 90) }} »</span>
@@ -122,6 +143,25 @@
                     </button>
                 </div>
             </form>
+
+            @if ($tab === 'mail')
+                {{-- Test d'envoi avec les réglages enregistrés --}}
+                <form method="POST" action="{{ route('admin.settings.mail-test') }}" class="mt-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    @csrf
+                    <h3 class="font-bold text-slate-900 mb-1"><i class="fas fa-paper-plane text-blue-600 mr-1"></i>Envoyer un e-mail de test</h3>
+                    <p class="text-sm text-slate-600 mb-3">
+                        @if (\App\Support\Site::mailConfigured())
+                            Vérifie que les réglages enregistrés fonctionnent.
+                        @else
+                            <span class="text-amber-700"><i class="fas fa-triangle-exclamation mr-1"></i>Enregistrez d’abord l’identifiant, la clé SMTP et l’adresse d’expéditeur.</span>
+                        @endif
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                        <input type="email" name="to" required value="{{ old('to', auth()->user()->email) }}" class="{{ $input }} text-sm sm:max-w-sm">
+                        <button class="bg-slate-900 text-white px-5 py-2 rounded-lg hover:bg-black transition font-semibold text-sm whitespace-nowrap">Envoyer le test</button>
+                    </div>
+                </form>
+            @endif
         @else
             {{-- Partenaires --}}
             <div class="space-y-4">

@@ -50,6 +50,22 @@ En ligne de commande : `php artisan social:sync youtube` (un réseau), ou `php a
 
 ---
 
+## E-mails et newsletter (Brevo)
+
+1. Créez un compte gratuit sur [brevo.com](https://www.brevo.com) (300 e-mails par jour).
+2. Dans Brevo → **Expéditeurs**, ajoutez et validez l'adresse qui enverra les e-mails (ex. `hopemediasociaux@gmail.com`).
+3. Dans Brevo → **Paramètres → SMTP & API → SMTP**, notez le **Login** et générez une **clé SMTP**.
+4. Dans le site : **Admin → Paramètres → E-mails**, collez le login et la clé, enregistrez, puis « Envoyer un e-mail de test ».
+
+Ensuite, tout est automatique :
+- chaque nouvel abonné reçoit un e-mail de bienvenue ;
+- la newsletter part chaque semaine (jour et heure dans **Paramètres → Newsletter**, vendredi 9 h par défaut) avec les nouveautés publiées depuis le dernier envoi. Sans nouveauté, rien n'est envoyé ;
+- l'envoi se fait par lots de 40 e-mails, déclenché par le cron (`php artisan newsletter:send`) ou, sans cron, par les visites du site.
+
+Suivi et aperçu : **Admin → Newsletter**. Journal : `storage/logs/newsletter.log`.
+
+---
+
 ## À chaque mise à jour
 
 Sur votre PC : enregistrez et envoyez vos changements (`git add`, `git commit`, `git push`).

@@ -65,6 +65,13 @@ class AppServiceProvider extends ServiceProvider
         // Paramètres du site (Admin → Paramètres) disponibles dans toutes les vues : $site->contact_email, etc.
         View::share('site', Site::instance());
 
+        // Envoi des e-mails : réglages de l'admin (Paramètres → E-mails) prioritaires sur le .env
+        try {
+            Site::applyMailConfig();
+        } catch (\Throwable) {
+            // Base indisponible (installation, migration) : on garde le .env.
+        }
+
         // En production (APP_ENV=production), interdit les commandes qui vident la base :
         // migrate:fresh, migrate:refresh, migrate:reset et db:wipe refusent de s'exécuter.
         DB::prohibitDestructiveCommands($this->app->isProduction());

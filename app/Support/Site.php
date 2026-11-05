@@ -8,6 +8,7 @@ use App\Models\Partner;
 use App\Models\Setting;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -56,13 +57,15 @@ final class Site
             'home'     => ['label' => 'Accueil', 'icon' => 'fa-house', 'intro' => 'Textes de la grande bannière d’accueil quand aucune vidéo ni article n’est à la une.'],
             'about'    => ['label' => 'Page « La chaîne »', 'icon' => 'fa-tv', 'intro' => 'Contenu de la page de présentation.'],
             'seo'      => ['label' => 'Référencement', 'icon' => 'fa-magnifying-glass', 'intro' => 'Description et image utilisées par Google, WhatsApp et Facebook quand une page n’a pas les siennes.'],
-            'system'   => ['label' => 'Système', 'icon' => 'fa-gears'],
+            'mail'       => ['label' => 'E-mails', 'icon' => 'fa-envelope', 'intro' => 'Service qui envoie les e-mails du site : newsletter, bienvenue des abonnés, réponses aux messages. Avec Brevo (gratuit jusqu’à 300 e-mails par jour) : brevo.com → Paramètres → « SMTP & API » → onglet SMTP. Copiez l’identifiant (login) et générez une « clé SMTP ». L’adresse d’expéditeur doit être validée dans Brevo → « Expéditeurs ».'],
+            'newsletter' => ['label' => 'Newsletter', 'icon' => 'fa-envelope-open-text', 'intro' => 'La newsletter part automatiquement chaque semaine aux abonnés actifs, avec les nouveautés publiées depuis le dernier envoi. S’il n’y a aucune nouveauté, rien n’est envoyé.'],
+            'system'     => ['label' => 'Système', 'icon' => 'fa-gears'],
         ];
     }
 
     /**
      * Description de tous les champs.
-     * Types : text, textarea, url, email, tel, image, boolean, lines (une valeur par ligne), select.
+     * Types : text, textarea, url, email, tel, image, boolean, lines (une valeur par ligne), select, secret (chiffré).
      *
      * @return array<string, array{group: string, type: string, label: string, default: mixed, help?: string, options?: array, placeholder?: string}>
      */
@@ -148,6 +151,23 @@ final class Site
             'seo_keywords'    => ['group' => 'seo', 'type' => 'text', 'label' => 'Mots-clés', 'default' => 'enseignements bibliques, église adventiste, prières, vidéos religieuses'],
             'seo_image'       => ['group' => 'seo', 'type' => 'image', 'label' => 'Image de partage par défaut', 'default' => 'images/hero-bible.jpg', 'help' => 'Format paysage 1200 × 630 px conseillé.'],
 
+            // E-mails (Brevo par défaut)
+            'mail_host'         => ['group' => 'mail', 'type' => 'text', 'label' => 'Serveur SMTP', 'default' => 'smtp-relay.brevo.com'],
+            'mail_port'         => ['group' => 'mail', 'type' => 'select', 'label' => 'Port', 'default' => '587', 'options' => ['587' => '587 (recommandé, STARTTLS)', '465' => '465 (SSL)', '2525' => '2525 (si 587 est bloqué)']],
+            'mail_username'     => ['group' => 'mail', 'type' => 'text', 'label' => 'Identifiant SMTP', 'default' => null, 'placeholder' => 'ex. 7a1b2c001@smtp-brevo.com', 'help' => 'Brevo : le « Login » affiché dans l’onglet SMTP (pas votre adresse de connexion).'],
+            'mail_password'     => ['group' => 'mail', 'type' => 'secret', 'label' => 'Clé SMTP / mot de passe', 'default' => null, 'help' => 'Chiffré dans la base, jamais réaffiché. Laissez vide pour conserver la clé enregistrée.'],
+            'mail_from_address' => ['group' => 'mail', 'type' => 'email', 'label' => 'Adresse d’expéditeur', 'default' => 'hopemediasociaux@gmail.com', 'help' => 'Doit être validée comme expéditeur dans Brevo.'],
+            'mail_from_name'    => ['group' => 'mail', 'type' => 'text', 'label' => 'Nom d’expéditeur', 'default' => 'Hope Media RDC'],
+
+            // Newsletter automatique
+            'newsletter_auto'    => ['group' => 'newsletter', 'type' => 'boolean', 'label' => 'Envoyer la newsletter automatiquement', 'default' => true],
+            'newsletter_day'     => ['group' => 'newsletter', 'type' => 'select', 'label' => 'Jour d’envoi', 'default' => 'friday', 'options' => ['monday' => 'Lundi', 'tuesday' => 'Mardi', 'wednesday' => 'Mercredi', 'thursday' => 'Jeudi', 'friday' => 'Vendredi', 'saturday' => 'Samedi', 'sunday' => 'Dimanche']],
+            'newsletter_hour'    => ['group' => 'newsletter', 'type' => 'select', 'label' => 'Heure d’envoi (heure de Kinshasa)', 'default' => '9', 'options' => array_combine(array_map('strval', range(6, 21)), array_map(fn ($h) => $h . ' h 00', range(6, 21)))],
+            'newsletter_subject' => ['group' => 'newsletter', 'type' => 'text', 'required' => true, 'label' => 'Objet de l’e-mail', 'default' => 'Cette semaine sur {site}', 'help' => '{site} est remplacé par le nom du site, {date} par la date du jour.'],
+            'newsletter_intro'   => ['group' => 'newsletter', 'type' => 'textarea', 'label' => 'Message d’introduction', 'default' => 'Voici les nouveautés publiées cette semaine. Bonne lecture et bon visionnage !'],
+            'newsletter_welcome' => ['group' => 'newsletter', 'type' => 'boolean', 'label' => 'Envoyer un e-mail de bienvenue aux nouveaux abonnés', 'default' => true],
+            'newsletter_welcome_text' => ['group' => 'newsletter', 'type' => 'textarea', 'label' => 'Texte de bienvenue', 'default' => "Merci de vous être abonné(e) ! Chaque semaine, vous recevrez les nouvelles vidéos, les enseignements et l'Écho de la mission."],
+
             // Système
             'sync_without_cron' => ['group' => 'system', 'type' => 'boolean', 'label' => 'Synchroniser les réseaux sans tâche planifiée (cron)', 'default' => true, 'help' => 'Si le serveur n’a pas de cron, les visites du site déclenchent la synchronisation automatique (au plus toutes les 15 minutes, après l’envoi de la page). Sans effet si le cron fonctionne déjà.'],
         ];
@@ -167,6 +187,15 @@ final class Site
 
         if (($def['type'] ?? null) === 'boolean') {
             return (bool) $value;
+        }
+
+        // Secrets (mot de passe SMTP) : chiffrés dans la base
+        if (($def['type'] ?? null) === 'secret' && $value !== null && $value !== '') {
+            try {
+                $value = Crypt::decryptString($value);
+            } catch (\Throwable) {
+                return $fallback;   // APP_KEY changée : la valeur doit être ressaisie
+            }
         }
 
         return ($value === '' || $value === null) ? $fallback : $value;
@@ -218,6 +247,36 @@ final class Site
         return $links;
     }
 
+    /** Le service d'envoi d'e-mails est-il configuré ? */
+    public static function mailConfigured(): bool
+    {
+        return (bool) (self::get('mail_host') && self::get('mail_username') && self::get('mail_password') && self::get('mail_from_address'));
+    }
+
+    /**
+     * Applique les réglages e-mail de l'admin à la configuration de Laravel
+     * (remplace MAIL_* du .env dès que le service est configuré).
+     */
+    public static function applyMailConfig(): void
+    {
+        if (! self::mailConfigured()) {
+            return;
+        }
+
+        $port = (int) self::get('mail_port', 587);
+        config([
+            'mail.default'                => 'smtp',
+            'mail.mailers.smtp.host'      => self::get('mail_host'),
+            'mail.mailers.smtp.port'      => $port,
+            'mail.mailers.smtp.scheme'    => $port === 465 ? 'smtps' : 'smtp',
+            'mail.mailers.smtp.username'  => self::get('mail_username'),
+            'mail.mailers.smtp.password'  => self::get('mail_password'),
+            'mail.mailers.smtp.timeout'   => 20,
+            'mail.from.address'           => self::get('mail_from_address'),
+            'mail.from.name'              => self::get('mail_from_name') ?: self::get('site_name'),
+        ]);
+    }
+
     /** Lien tel: d'un numéro. */
     public static function telHref(?string $phone): ?string
     {
@@ -248,6 +307,9 @@ final class Site
         foreach ($values as $key => $value) {
             if (! isset(self::schema()[$key])) {
                 continue;
+            }
+            if (self::schema()[$key]['type'] === 'secret' && $value !== null && $value !== '') {
+                $value = Crypt::encryptString((string) $value);
             }
             Setting::updateOrCreate(['key' => $key], ['value' => is_bool($value) ? ($value ? '1' : '0') : $value]);
         }

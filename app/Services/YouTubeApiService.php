@@ -337,6 +337,28 @@ final class YouTubeApiService
             'msg'    => $msg,
         ]);
 
-        throw new \RuntimeException("YouTube API error [{$status}] {$reason}: {$msg}");
+        // Raison détaillée de Google (ex. API_KEY_INVALID), présente dans error.details
+        $detail = '';
+        foreach ($error['details'] ?? [] as $d) {
+            $detail = $d['reason'] ?? $detail;
+        }
+
+        $hint = match (true) {
+            $detail === 'API_KEY_INVALID' || str_contains($msg, 'API key not valid')
+                => 'La clé API YouTube est refusée par Google (clé fausse, supprimée ou mal copiée). '
+                 . 'Dans Google Cloud → « API et services » → « Identifiants », copiez une clé valide, '
+                 . 'puis collez-la dans Admin → Synchronisation des réseaux → YouTube → « Clé API », et enregistrez.',
+            in_array($detail, ['API_KEY_HTTP_REFERRER_BLOCKED', 'API_KEY_IP_ADDRESS_BLOCKED', 'API_KEY_SERVICE_BLOCKED'], true)
+                || str_contains($msg, 'are blocked')
+                => 'La clé API YouTube est restreinte et bloque ce serveur. Dans Google Cloud → « Identifiants » → votre clé, '
+                 . 'mettez « Restrictions relatives aux applications : Aucune » (ou ajoutez l’adresse IP du serveur), '
+                 . 'et autorisez « YouTube Data API v3 » dans les restrictions d’API.',
+            $reason === 'accessNotConfigured' || $detail === 'SERVICE_DISABLED'
+                => 'L’API « YouTube Data API v3 » n’est pas activée pour ce projet Google Cloud. '
+                 . 'Activez-la dans « API et services » → « Bibliothèque ».',
+            default => null,
+        };
+
+        throw new \RuntimeException($hint ? "YouTube : {$hint}" : "YouTube API error [{$status}] {$reason}: {$msg}");
     }
 }

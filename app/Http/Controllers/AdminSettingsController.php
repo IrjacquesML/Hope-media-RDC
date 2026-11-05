@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\TestMail;
 use App\Models\Partner;
+use App\Services\NewsletterService;
+use Illuminate\Support\Facades\Mail;
 use App\Support\Site;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +29,11 @@ class AdminSettingsController extends Controller
 
         $fields = collect(Site::schema())
             ->filter(fn ($f) => $f['group'] === $tab)
-            ->map(fn ($f, $key) => $f + ['value' => Site::get($key), 'custom' => Site::isCustom($key)]);
+            // Les secrets ne quittent jamais le serveur : la vue sait seulement s'ils existent
+            ->map(fn ($f, $key) => $f + [
+                'value'  => $f['type'] === 'secret' ? (Site::get($key) ? true : null) : Site::get($key),
+                'custom' => Site::isCustom($key),
+            ]);
 
         return view('admin.settings.index', [
             'groups'   => $groups,
@@ -50,6 +57,7 @@ class AdminSettingsController extends Controller
                 'email'    => ['nullable', 'email', 'max:255'],
                 'image'    => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:3072'],
                 'textarea', 'lines' => ['nullable', 'string', 'max:10000'],
+                'select'   => ['nullable', 'in:' . implode(',', array_keys($f['options']))],
                 default    => ['nullable', 'string', 'max:500'],
             };
             if (!empty($f['required']) && $f['type'] !== 'boolean' && $f['type'] !== 'image') {
@@ -71,6 +79,16 @@ class AdminSettingsController extends Controller
         foreach ($fields as $key => $f) {
             if ($f['type'] === 'boolean') {
                 $values[$key] = $request->boolean($key);
+                continue;
+            }
+
+            // Secret : jamais réaffiché ; vide = on garde la valeur enregistrée
+            if ($f['type'] === 'secret') {
+                if ($request->boolean("{$key}_default")) {
+                    Site::reset($key);
+                } elseif (trim((string) ($data[$key] ?? '')) !== '') {
+                    $values[$key] = trim((string) $data[$key]);
+                }
                 continue;
             }
 
@@ -103,6 +121,25 @@ class AdminSettingsController extends Controller
 
         return redirect()->route('admin.settings.index', ['onglet' => $group])
             ->with('success', 'Paramètres « ' . Site::groups()[$group]['label'] . ' » enregistrés. Le site est à jour.');
+    }
+
+    /** Envoie un e-mail de test avec les réglages enregistrés. */
+    public function testMail(Request $request): RedirectResponse
+    {
+        $data = $request->validate(['to' => ['required', 'email']], [], ['to' => 'adresse de test']);
+        $back = redirect()->route('admin.settings.index', ['onglet' => 'mail']);
+
+        if (!Site::mailConfigured()) {
+            return $back->with('error', 'Renseignez d’abord le serveur, l’identifiant, la clé SMTP et l’adresse d’expéditeur, puis enregistrez.');
+        }
+
+        try {
+            Mail::to($data['to'])->send(new TestMail());
+        } catch (\Throwable $e) {
+            return $back->with('error', 'L’envoi a échoué : ' . NewsletterService::explainMailError($e));
+        }
+
+        return $back->with('success', "E-mail de test envoyé à {$data['to']}. S’il n’arrive pas dans quelques minutes, regardez dans les spams et vérifiez que l’adresse d’expéditeur est validée dans Brevo.");
     }
 
     // PARTENAIRES

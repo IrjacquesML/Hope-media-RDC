@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\NewsletterSubscription;
+use App\Services\NewsletterService;
 use Illuminate\Http\Request;
 
 class NewsletterController extends Controller
@@ -22,16 +23,18 @@ class NewsletterController extends Controller
             }
             // Réactiver l'abonnement désactivé
             $existing->update(['is_active' => true, 'name' => $validated['name'] ?? $existing->name]);
+            $this->sendWelcomeAfterResponse($existing);
 
             return back()->with('newsletter_success', 'Votre abonnement a été réactivé. Merci !');
         }
 
-        NewsletterSubscription::create([
+        $subscription = NewsletterSubscription::create([
             'email'    => $validated['email'],
             'name'     => $validated['name'] ?? null,
             'token'    => NewsletterSubscription::generateToken(),
             'is_active' => true,
         ]);
+        $this->sendWelcomeAfterResponse($subscription);
 
         return back()->with('newsletter_success', 'Merci ! Vous êtes maintenant abonné(e) à notre newsletter.');
     }
@@ -42,5 +45,11 @@ class NewsletterController extends Controller
         $subscription->update(['is_active' => false]);
 
         return view('news.unsubscribed');
+    }
+
+    /** E-mail de bienvenue envoyé après la réponse : l'inscription reste instantanée. */
+    private function sendWelcomeAfterResponse(NewsletterSubscription $subscription): void
+    {
+        app()->terminating(fn () => app(NewsletterService::class)->welcome($subscription));
     }
 }

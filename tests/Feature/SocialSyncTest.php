@@ -104,6 +104,30 @@ class SocialSyncTest extends TestCase
 
     // ---------------------------------------------------------------- YouTube
 
+    public function test_youtube_invalid_key_is_explained_in_french(): void
+    {
+        $this->configure('youtube', ['api_key' => 'AIza-fausse', 'channel_id' => '@Hopemedia-u4b']);
+        Http::fake(['www.googleapis.com/*' => Http::response(['error' => [
+            'code' => 400, 'message' => 'API key not valid. Please pass a valid API key.',
+            'errors' => [['reason' => 'badRequest']],
+            'details' => [['@type' => 'type.googleapis.com/google.rpc.ErrorInfo', 'reason' => 'API_KEY_INVALID']],
+        ]], 400)]);
+
+        $this->actingAs(User::factory()->create())->post(route('admin.social.sync', 'youtube'))
+            ->assertSessionHas('error', fn ($m) => str_contains($m, 'clé API YouTube est refusée') && str_contains($m, 'Google Cloud'));
+        $this->assertStringContainsString('clé API YouTube est refusée', SocialPlatform::for('youtube')->last_message);
+    }
+
+    public function test_spaces_around_pasted_keys_are_removed(): void
+    {
+        $this->configure('youtube', ['api_key' => "  AIza-cle\n", 'channel_id' => ' @Hopemedia-u4b ']);
+
+        $c = app(SocialSyncManager::class)->credentials('youtube');
+
+        $this->assertSame('AIza-cle', $c['api_key']);
+        $this->assertSame('@Hopemedia-u4b', $c['channel_id']);
+    }
+
     public function test_youtube_test_and_sync(): void
     {
         $this->configure('youtube', ['api_key' => 'AIza', 'channel_id' => '@Hopemedia-u4b']);

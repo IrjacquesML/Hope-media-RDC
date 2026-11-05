@@ -16,6 +16,7 @@ use App\Http\Controllers\LikeController;
 use App\Http\Controllers\AdminSocialController;
 use App\Http\Controllers\AdminSettingsController;
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\AdminNewsletterController;
 use App\Http\Controllers\AdminProfileController;
 use Illuminate\Support\Facades\Route;
 
@@ -234,7 +235,10 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
 
         // Newsletter
         Route::prefix('newsletter')->name('newsletter.')->group(function () {
-            Route::get('/', [AdminController::class, 'newsletter'])->name('index');
+            Route::get('/', [AdminNewsletterController::class, 'index'])->name('index');
+            Route::get('/apercu', [AdminNewsletterController::class, 'preview'])->name('preview');
+            Route::post('/test', [AdminNewsletterController::class, 'test'])->middleware('throttle:10,1')->name('test');
+            Route::post('/envois/{campaign}/relancer', [AdminNewsletterController::class, 'retry'])->name('retry');
             Route::delete('/{subscriber}', [AdminController::class, 'deleteSubscriber'])->name('delete');
         });
     });
@@ -244,6 +248,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::prefix('parametres')->name('settings.')->group(function () {
             Route::get('/', [AdminSettingsController::class, 'index'])->name('index');
             Route::put('/groupe/{group}', [AdminSettingsController::class, 'update'])->name('update');
+            Route::post('/email-de-test', [AdminSettingsController::class, 'testMail'])->middleware('throttle:10,1')->name('mail-test');
             Route::post('/partenaires', [AdminSettingsController::class, 'storePartner'])->name('partners.store');
             Route::put('/partenaires/{partner}', [AdminSettingsController::class, 'updatePartner'])->name('partners.update');
             Route::delete('/partenaires/{partner}', [AdminSettingsController::class, 'deletePartner'])->name('partners.delete');

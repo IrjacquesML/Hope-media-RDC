@@ -17,7 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => \App\Http\Middleware\EnsureRole::class,
         ]);
         $middleware->web(append: [
-            \App\Http\Middleware\TriggerSocialSync::class,
+            \App\Http\Middleware\RunScheduledTasks::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -21,3 +21,10 @@ Schedule::command('social:sync')
     ->everyFifteenMinutes()
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/social-sync.log'));
+
+// Newsletter automatique hebdomadaire (jour et heure réglés dans Admin → Paramètres → Newsletter).
+// Vérifie toutes les 5 minutes si l'envoi est dû, puis envoie par lots de 40 e-mails.
+Schedule::command('newsletter:send')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/newsletter.log'));

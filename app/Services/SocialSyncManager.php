@@ -29,7 +29,9 @@ final class SocialSyncManager
         $model = SocialPlatform::for($platform);
         $values = [];
         foreach (SocialPlatforms::get($platform)['fields'] as $field => $_) {
-            $values[$field] = $model->storedCredential($field) ?? $this->envValue($platform, $field);
+            $value = $model->storedCredential($field) ?? $this->envValue($platform, $field);
+            // Espaces, retours à la ligne ou guillemets collés avec la clé : Google la refuserait
+            $values[$field] = $value === null ? null : (trim($value, " \t\n\r\0\x0B\"'") ?: null);
         }
 
         return $values;
