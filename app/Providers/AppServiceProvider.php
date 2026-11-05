@@ -10,6 +10,8 @@ use App\Services\YouTubeApiService;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\View;
+use App\Support\Site;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -59,6 +61,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Paginator::useTailwind();
+
+        // Paramètres du site (Admin → Paramètres) disponibles dans toutes les vues : $site->contact_email, etc.
+        View::share('site', Site::instance());
 
         // En production (APP_ENV=production), interdit les commandes qui vident la base :
         // migrate:fresh, migrate:refresh, migrate:reset et db:wipe refusent de s'exécuter.

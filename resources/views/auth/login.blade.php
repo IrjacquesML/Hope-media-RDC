@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion Admin - Hope Media RDC</title>
+    <title>Connexion - Administration {{ $site->site_name }}</title>
+    <meta name="robots" content="noindex, nofollow">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 </head>
@@ -13,11 +14,11 @@
         <div class="bg-white rounded-lg shadow-2xl p-8">
             <!-- En-tête -->
             <div class="text-center mb-8">
-                <a href="{{ route('home') }}" class="flex justify-center mb-4" aria-label="Hope Media RDC — Accueil">
-                    <img src="{{ asset('images/brand/logo-hope-media.webp') }}" alt="Hope Media Network-DRC" width="360" height="314" class="h-24 w-auto">
+                <a href="{{ route('home') }}" class="flex justify-center mb-4" aria-label="{{ $site->site_name }} — Accueil">
+                    @if ($site->logo_light)<img src="{{ asset($site->logo_light) }}" alt="{{ $site->site_full_name }}" width="360" height="314" class="h-24 w-auto">@endif
                 </a>
-                <h1 class="text-3xl font-bold text-slate-900 mb-2">Admin Login</h1>
-                <p class="text-slate-600">Hope Media RDC - Panneau d'Administration</p>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">Connexion</h1>
+                <p class="text-slate-600">{{ $site->site_name }} — Administration</p>
             </div>
 
             <!-- Messages d'erreur -->
@@ -118,7 +119,7 @@
 
         <!-- Footer -->
         <div class="text-center mt-6 text-white text-sm">
-            <p>&copy; 2024 Hope Media RDC. Tous droits réservés.</p>
+            <p>&copy; {{ date('Y') }} {{ $site->site_name }}. Tous droits réservés.</p>
         </div>
     </div>
 </body>

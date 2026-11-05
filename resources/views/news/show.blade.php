@@ -5,6 +5,8 @@
 @section('og_type', 'article')
 @if ($article->featured_image)
     @section('og_image', asset($article->featured_image))
+@elseif ($article->images->isNotEmpty())
+    @section('og_image', asset($article->images->first()->image))
 @endif
 
 @php
@@ -43,9 +45,46 @@
         </div>
     </header>
 
-    @if ($article->featured_image)
+    @php
+        $slides = collect();
+        if ($article->featured_image) {
+            $slides->push(['src' => $article->featured_image, 'caption' => null]);
+        }
+        foreach ($article->images as $img) {
+            $slides->push(['src' => $img->image, 'caption' => $img->caption]);
+        }
+    @endphp
+
+    @if ($slides->count() > 1)
+        <section class="article-cover article-carousel" style="margin:24px 0 0" data-carousel data-slide-ms="6000"
+                 aria-roledescription="carrousel" aria-label="Images de l'article">
+            <div class="ac-track">
+                @foreach ($slides as $i => $slide)
+                    <figure class="ac-slide{{ $i === 0 ? ' is-active' : '' }}" role="group" aria-roledescription="diapositive"
+                            aria-label="{{ $i + 1 }} sur {{ $slides->count() }}" @if ($i !== 0) aria-hidden="true" @endif>
+                        <img src="{{ asset($slide['src']) }}" alt="{{ $slide['caption'] ?: $article->title }}"
+                             @if ($i === 0) fetchpriority="high" @else loading="lazy" @endif decoding="async">
+                        @if ($slide['caption'])
+                            <figcaption>{{ $slide['caption'] }}</figcaption>
+                        @endif
+                    </figure>
+                @endforeach
+            </div>
+            <button type="button" class="ac-nav ac-prev" data-carousel-prev aria-label="Image précédente"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+            <button type="button" class="ac-nav ac-next" data-carousel-next aria-label="Image suivante"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+            <div class="ac-dots" role="group" aria-label="Choisir une image">
+                @foreach ($slides as $i => $slide)
+                    <button type="button" data-index="{{ $i }}" aria-label="Image {{ $i + 1 }}" aria-current="{{ $i === 0 ? 'true' : 'false' }}"></button>
+                @endforeach
+            </div>
+            <span class="ac-count" aria-live="polite"><span data-carousel-current>1</span> / {{ $slides->count() }}</span>
+        </section>
+    @elseif ($slides->isNotEmpty())
         <figure class="article-cover" style="margin:24px 0 0">
-            <img src="{{ asset($article->featured_image) }}" alt="{{ $article->title }}" decoding="async">
+            <img src="{{ asset($slides[0]['src']) }}" alt="{{ $slides[0]['caption'] ?: $article->title }}" decoding="async">
+            @if ($slides[0]['caption'])
+                <figcaption class="ac-caption-static">{{ $slides[0]['caption'] }}</figcaption>
+            @endif
         </figure>
     @endif
 

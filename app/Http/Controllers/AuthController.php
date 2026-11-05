@@ -29,7 +29,15 @@ class AuthController extends Controller
         ]);
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            if (!Auth::user()->is_active) {
+                Auth::logout();
+                return back()->withErrors([
+                    'email' => 'Ce compte a été désactivé. Contactez un super administrateur.',
+                ])->onlyInput('email');
+            }
+
             $request->session()->regenerate();
+            Auth::user()->forceFill(['last_login_at' => now()])->save();
             return redirect()->intended(route('admin.dashboard'))->with('success', 'Connexion réussie!');
         }
 

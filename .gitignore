@@ -22,6 +22,7 @@
 /public/images/news/*
 /public/images/hero/*
 /public/images/resources/*
+/public/images/settings/*
 # Sauvegardes locales éventuelles
 /storage/backups
 /storage/*.key

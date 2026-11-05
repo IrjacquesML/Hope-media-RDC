@@ -1,14 +1,14 @@
 @extends('layouts.app')
 
 @section('title', 'Demande de Prière')
-@section('meta_description', 'Soumettez vos demandes de prière à Hope Media RDC. Notre communauté prie pour vous.')
+@section('meta_description', 'Soumettez vos demandes de prière à ' . $site->site_name . '. Notre communauté prie pour vous.')
 
 @section('content')
 <section class="wrap" style="padding-top:calc(env(safe-area-inset-top,0px) + 92px)">
     <div class="prayer">
         <x-site.art theme="t-dawn" icon="fa-hands-praying" style="--gx:80%;--gy:10%" />
         <div class="prayer-in">
-            <span class="hero-slogan" style="font-size:.95rem">Hope Media RDC</span>
+            <span class="hero-slogan" style="font-size:.95rem">{{ $site->site_name }}</span>
             <h1>Ligne de prière</h1>
             <p>Envoyez votre sujet de prière : l’équipe d’intercession prie pour vous, en toute confidentialité.</p>
             <p class="verse">« Déchargez-vous sur lui de tous vos soucis, car lui-même prend soin de vous. » — 1 Pierre 5:7</p>

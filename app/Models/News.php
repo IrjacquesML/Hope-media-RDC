@@ -33,6 +33,14 @@ class News extends Model
         'tags' => 'array',
     ];
 
+    /**
+     * Images du carrousel de l'article, dans l'ordre d'affichage.
+     */
+    public function images()
+    {
+        return $this->hasMany(NewsImage::class)->orderBy('sort_order')->orderBy('id');
+    }
+
     public function comments()
     {
         return $this->morphMany(Comment::class, 'commentable')

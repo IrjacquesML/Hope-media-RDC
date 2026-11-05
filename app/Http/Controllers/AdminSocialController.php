@@ -11,6 +11,9 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use App\Support\Site;
 use Illuminate\View\View;
 
 /**
@@ -47,6 +50,9 @@ class AdminSocialController extends Controller
         return view('admin.social.index', [
             'platforms'      => $platforms,
             'schedulerRunAt' => $heartbeat ? Carbon::parse($heartbeat) : null,
+            'autoWithoutCron' => Site::get('sync_without_cron'),
+            'tiktokRedirect' => route('admin.social.tiktok.callback'),
+            'configuredCount' => count(array_filter(SocialPlatforms::keys(), fn ($k) => $this->manager->isConfigured($k))),
         ]);
     }
 
@@ -117,6 +123,107 @@ class AdminSocialController extends Controller
             return back()->with('success', "{$def['label']} : {$count} vidéo(s) synchronisée(s).");
         } catch (\Throwable $e) {
             return back()->with('error', "{$def['label']} : la synchronisation a échoué. {$e->getMessage()}");
+        }
+    }
+
+    /** Synchronise tous les réseaux configurés, activés ou non. */
+    public function syncAll(): RedirectResponse
+    {
+        @set_time_limit(300);
+        $ok = [];
+        $errors = [];
+        foreach (SocialPlatforms::keys() as $platform) {
+            if (! $this->manager->isConfigured($platform)) {
+                continue;
+            }
+            $label = SocialPlatforms::get($platform)['label'];
+            try {
+                $ok[] = "{$label} : " . $this->manager->sync($platform);
+            } catch (\Throwable $e) {
+                $errors[] = "{$label} : {$e->getMessage()}";
+            }
+        }
+
+        if (! $ok && ! $errors) {
+            return back()->with('error', 'Aucun réseau n’est encore configuré.');
+        }
+
+        $redirect = back();
+        if ($ok) {
+            $redirect = $redirect->with('success', 'Vidéos synchronisées — ' . implode(' · ', $ok) . '.');
+        }
+        if ($errors) {
+            $redirect = $redirect->with('error', 'Échecs — ' . implode(' · ', $errors));
+        }
+
+        return $redirect;
+    }
+
+    /**
+     * TikTok : envoie l'administrateur sur TikTok pour autoriser l'application avec le compte
+     * Hope Media. Au retour, les jetons sont enregistrés automatiquement.
+     */
+    public function tiktokConnect(Request $request): RedirectResponse
+    {
+        $c = $this->manager->credentials('tiktok');
+        if (empty($c['client_key']) || empty($c['client_secret'])) {
+            return redirect()->to(route('admin.social.index') . '#reseau-tiktok')
+                ->with('error', 'TikTok : enregistrez d’abord le Client Key et le Client Secret de votre application.');
+        }
+
+        $state = Str::random(40);
+        $request->session()->put('tiktok_oauth_state', $state);
+
+        return redirect()->away('https://www.tiktok.com/v2/auth/authorize/?' . http_build_query([
+            'client_key'    => $c['client_key'],
+            'scope'         => 'user.info.basic,video.list',
+            'response_type' => 'code',
+            'redirect_uri'  => route('admin.social.tiktok.callback'),
+            'state'         => $state,
+        ]));
+    }
+
+    public function tiktokCallback(Request $request): RedirectResponse
+    {
+        $back = redirect()->to(route('admin.social.index') . '#reseau-tiktok');
+        $expected = $request->session()->pull('tiktok_oauth_state');
+
+        if (! $expected || ! hash_equals($expected, (string) $request->query('state'))) {
+            return $back->with('error', 'TikTok : la demande d’autorisation a expiré ou n’est pas valide. Recommencez.');
+        }
+        if ($request->filled('error')) {
+            return $back->with('error', 'TikTok : autorisation refusée (' . $request->query('error_description', $request->query('error')) . ').');
+        }
+
+        $c = $this->manager->credentials('tiktok');
+        try {
+            $response = Http::timeout(15)->asForm()->post('https://open.tiktokapis.com/v2/oauth/token/', [
+                'client_key'    => $c['client_key'],
+                'client_secret' => $c['client_secret'],
+                'code'          => (string) $request->query('code'),
+                'grant_type'    => 'authorization_code',
+                'redirect_uri'  => route('admin.social.tiktok.callback'),
+            ]);
+        } catch (\Throwable $e) {
+            return $back->with('error', 'TikTok : impossible de joindre TikTok. ' . $e->getMessage());
+        }
+
+        if ($response->failed() || empty($response->json('access_token'))) {
+            $msg = $response->json('error_description') ?: ($response->json('error') ?: $response->body());
+            return $back->with('error', "TikTok : l’échange du code a échoué. {$msg}");
+        }
+
+        $this->manager->storeCredentials('tiktok', [
+            'access_token'  => $response->json('access_token'),
+            'refresh_token' => $response->json('refresh_token'),
+            'open_id'       => $response->json('open_id'),
+        ]);
+
+        try {
+            $account = $this->manager->test('tiktok');
+            return $back->with('success', "TikTok : compte « {$account} » connecté. Vous pouvez maintenant synchroniser.");
+        } catch (\Throwable $e) {
+            return $back->with('success', 'TikTok : jetons enregistrés. ' . $e->getMessage());
         }
     }
 

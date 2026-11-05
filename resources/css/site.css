@@ -491,6 +491,23 @@ footer.site-footer { background: var(--surface); border-top: 1px solid var(--lin
 .article-head h1 { margin: 0; font: 400 clamp(2.2rem, 6vw, 4rem)/.95 var(--f-display); letter-spacing: .01em; text-wrap: balance; }
 .article-cover { border-radius: calc(var(--r) * 1.4); overflow: hidden; position: relative; max-width: 100%; }
 .article-cover img { width: 100%; max-height: 560px; object-fit: cover; }
+.ac-caption-static { padding: 10px 14px; font-size: .9rem; color: var(--muted); background: var(--surface); }
+/* Carrousel d'images d'un article */
+.article-carousel { background: var(--surface); }
+.ac-track { display: grid; aspect-ratio: 16 / 9; max-height: 560px; width: 100%; }
+.ac-slide { grid-area: 1 / 1; margin: 0; position: relative; opacity: 0; visibility: hidden; transition: opacity .6s ease, visibility 0s linear .6s; }
+.ac-slide.is-active { opacity: 1; visibility: visible; transition: opacity .6s ease; }
+.ac-slide img { width: 100%; height: 100%; max-height: none; object-fit: cover; }
+.ac-slide figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 40px 18px 46px; font-size: .95rem; color: #fff; background: linear-gradient(transparent, rgba(var(--scrim), .85)); }
+.ac-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(var(--scrim), .55); border: 1px solid rgba(255, 255, 255, .2); transition: background .2s; z-index: 2; }
+.ac-nav:hover, .ac-nav:focus-visible { background: var(--gold); color: var(--on-gold); }
+.ac-prev { left: 12px; } .ac-next { right: 12px; }
+.ac-dots { position: absolute; left: 50%; bottom: 8px; transform: translateX(-50%); display: flex; gap: 2px; z-index: 2; }
+.ac-dots button { width: 30px; height: 28px; position: relative; }
+.ac-dots button::before { content: ""; position: absolute; left: 4px; right: 4px; top: 12px; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .45); }
+.ac-dots button[aria-current="true"]::before { background: var(--gold); }
+.ac-count { position: absolute; top: 12px; right: 12px; padding: 4px 10px; border-radius: 999px; font-size: .8rem; color: #fff; background: rgba(var(--scrim), .6); z-index: 2; }
+@media (max-width: 600px) { .ac-nav { width: 36px; height: 36px; } .ac-dots button { width: 22px; } }
 .article-layout { display: grid; gap: 36px; }
 @media (min-width: 1100px) { .article-layout { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
 .prose { max-width: 70ch; font-size: 1.12rem; line-height: 1.75; overflow-wrap: break-word; }
@@ -822,3 +839,14 @@ time, .chip, .count, .stats, .counter strong, .ticker-track time, .clock b { fon
 @media (max-width: 640px) {
   .hero h1.is-caps, .hero h1.is-caps.is-long { font-size: clamp(1.4rem, 6vw, 1.75rem); }
 }
+
+/* Pied de page : partenaires (gérés dans Admin → Paramètres → Partenaires) */
+@media (min-width: 1000px) { .f-grid:has(.f-partners) { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr); } }
+.f-partners ul { gap: 2px; }
+.f-partners li a, .f-partner-plain { display: inline-flex; align-items: center; gap: 10px; min-height: 40px; color: var(--muted); }
+.f-partners li a:hover { color: var(--fg); }
+.f-partners li a:hover span { text-decoration: underline; text-underline-offset: 3px; }
+.f-partners img { width: 34px; height: 34px; object-fit: contain; border-radius: 6px; background: #fff; padding: 2px; flex: none; }
+.f-partners li a i { font-size: .7rem; opacity: .6; }
+.f-social { flex-wrap: wrap; }
+.p-whatsapp { --pc: #25D366; } .p-telegram { --pc: #229ED9; } .p-linkedin { --pc: #0A66C2; }

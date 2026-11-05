@@ -14,6 +14,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'auth' => \App\Http\Middleware\Authenticate::class,
             'guest' => \App\Http\Middleware\Guest::class,
+            'role' => \App\Http\Middleware\EnsureRole::class,
+        ]);
+        $middleware->web(append: [
+            \App\Http\Middleware\TriggerSocialSync::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

@@ -30,7 +30,15 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => 'super_admin',
+            'is_active' => true,
         ];
+    }
+
+    /** Compte avec un rôle précis : User::factory()->role('editor')->create(). */
+    public function role(string $role): static
+    {
+        return $this->state(fn () => ['role' => $role]);
     }
 
     /**

@@ -97,6 +97,44 @@
     show(0); start();
   }
 
+  /* ---------- Carrousel d'images des articles ---------- */
+  $$('[data-carousel]').forEach(box => {
+    const items = $$('.ac-slide', box);
+    if (items.length < 2) return;
+    const dots = $$('.ac-dots button', box);
+    const current = $('[data-carousel-current]', box);
+    const ms = +box.dataset.slideMs || 6000;
+    let idx = 0, timer, paused = false, touchX = 0;
+    const show = i => {
+      idx = (i + items.length) % items.length;
+      items.forEach((s, k) => {
+        s.classList.toggle('is-active', k === idx);
+        if (k === idx) s.removeAttribute('aria-hidden'); else s.setAttribute('aria-hidden', 'true');
+      });
+      dots.forEach((d, k) => d.setAttribute('aria-current', k === idx));
+      if (current) current.textContent = idx + 1;
+    };
+    const start = () => { clearInterval(timer); if (!reduceMotion) timer = setInterval(() => { if (!paused && !document.hidden) show(idx + 1); }, ms); };
+    $('[data-carousel-prev]', box)?.addEventListener('click', () => { show(idx - 1); start(); });
+    $('[data-carousel-next]', box)?.addEventListener('click', () => { show(idx + 1); start(); });
+    dots.forEach(d => d.addEventListener('click', () => { show(+d.dataset.index); start(); }));
+    box.addEventListener('mouseenter', () => { paused = true; });
+    box.addEventListener('mouseleave', () => { paused = false; });
+    box.addEventListener('focusin', () => { paused = true; });
+    box.addEventListener('focusout', e => { if (!box.contains(e.relatedTarget)) paused = false; });
+    box.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft') { show(idx - 1); start(); }
+      else if (e.key === 'ArrowRight') { show(idx + 1); start(); }
+    });
+    box.addEventListener('touchstart', e => { touchX = e.changedTouches[0].screenX; }, { passive: true });
+    box.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].screenX - touchX;
+      if (Math.abs(dx) < 40) return;
+      show(idx + (dx < 0 ? 1 : -1)); start();
+    }, { passive: true });
+    show(0); start();
+  });
+
   /* ---------- Flash info ---------- */
   $('#tickerPause')?.addEventListener('click', e => {
     const p = $('#ticker').classList.toggle('is-paused');

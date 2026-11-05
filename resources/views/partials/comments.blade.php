@@ -50,7 +50,7 @@
                             @foreach ($comment->replies as $reply)
                                 <div class="reply">
                                     <div class="comment-head">
-                                        <span class="official"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> Hope Media RDC</span>
+                                        <span class="official"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> {{ $site->site_name }}</span>
                                         <strong>{{ $reply->author_name }}</strong>
                                         <span class="muted">{{ $reply->created_at->diffForHumans() }}</span>
                                     </div>

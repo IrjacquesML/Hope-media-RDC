@@ -4,6 +4,7 @@ use App\Http\Controllers\AboutController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\AdminReportController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\VideoController;
 use App\Http\Controllers\NewsController;
@@ -13,6 +14,9 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\LikeController;
 use App\Http\Controllers\AdminSocialController;
+use App\Http\Controllers\AdminSettingsController;
+use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\AdminProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -116,10 +120,18 @@ Route::prefix('auth')->name('auth.')->group(function () {
 Route::get('/login', [AuthController::class, 'showLoginForm'])->middleware('guest')->name('login');
 
 // ROUTES ADMINISTRATION
+// Trois niveaux d'accès (voir App\Models\User::ROLES) :
+//   tous les comptes (rédacteur et plus) → contenus ; role:admin → audience, diffusion, rapports ;
+//   role:super_admin → paramètres du site, partenaires, comptes.
 Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
-    // Dashboard
+    // Dashboard et profil (tous les comptes)
     Route::get('/', [AdminController::class, 'dashboard'])->name('dashboard');
-    
+    Route::get('/mon-profil', [AdminProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/mon-profil', [AdminProfileController::class, 'update'])->name('profile.update');
+    Route::put('/mon-profil/mot-de-passe', [AdminProfileController::class, 'password'])->name('profile.password');
+
+    // ---------------- CONTENUS (rédacteur et plus) ----------------
+
     // Posts
     Route::prefix('posts')->name('posts.')->group(function () {
         Route::get('/', [AdminController::class, 'posts'])->name('index');
@@ -132,7 +144,7 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
 
     // Import contenu réseaux sociaux (AJAX)
     Route::get('/social-media/fetch', [AdminController::class, 'fetchSocialMedia'])->name('social-media.fetch');
-    
+
     // Catégories
     Route::prefix('categories')->name('categories.')->group(function () {
         Route::get('/', [AdminController::class, 'categories'])->name('index');
@@ -142,34 +154,17 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::put('/{category}', [AdminController::class, 'updateCategory'])->name('update');
         Route::delete('/{category}', [AdminController::class, 'deleteCategory'])->name('delete');
     });
-    
+
     // Médias
     Route::prefix('medias')->name('medias.')->group(function () {
         Route::get('/', [AdminController::class, 'medias'])->name('index');
         Route::delete('/{media}', [AdminController::class, 'deleteMedia'])->name('delete');
     });
 
-    // Vidéos / synchronisation réseaux sociaux
+    // Vidéos (liste et suppression)
     Route::prefix('videos')->name('videos.')->group(function () {
         Route::get('/', [AdminController::class, 'videos'])->name('index');
-        Route::post('/sync/{platform}', [AdminController::class, 'syncVideos'])->name('sync');
         Route::delete('/{video}', [AdminController::class, 'deleteVideo'])->name('delete');
-    });
-
-    // Réseaux sociaux : identifiants, test de connexion, synchronisation
-    Route::prefix('reseaux-sociaux')->name('social.')->group(function () {
-        Route::get('/', [AdminSocialController::class, 'index'])->name('index');
-        Route::put('/{platform}', [AdminSocialController::class, 'update'])->name('update');
-        Route::post('/{platform}/test', [AdminSocialController::class, 'test'])->name('test');
-        Route::post('/{platform}/sync', [AdminSocialController::class, 'sync'])->name('sync');
-    });
-
-    // Contacts
-    Route::prefix('contacts')->name('contacts.')->group(function () {
-        Route::get('/', [AdminController::class, 'contacts'])->name('index');
-        Route::get('/{contact}', [AdminController::class, 'viewContact'])->name('show');
-        Route::post('/{contact}/reply', [AdminController::class, 'replyContact'])->name('reply');
-        Route::post('/{contact}/archive', [AdminController::class, 'archiveContact'])->name('archive');
     });
 
     // Actualités (News)
@@ -192,19 +187,6 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::delete('/{heroSlide}', [AdminController::class, 'deleteHeroSlide'])->name('delete');
     });
 
-    // Commentaires
-    Route::prefix('comments')->name('comments.')->group(function () {
-        Route::get('/', [AdminController::class, 'comments'])->name('index');
-        Route::post('/{comment}/reply', [AdminController::class, 'replyComment'])->name('reply');
-        Route::delete('/{comment}', [AdminController::class, 'deleteComment'])->name('delete');
-    });
-
-    // Newsletter
-    Route::prefix('newsletter')->name('newsletter.')->group(function () {
-        Route::get('/', [AdminController::class, 'newsletter'])->name('index');
-        Route::delete('/{subscriber}', [AdminController::class, 'deleteSubscriber'])->name('delete');
-    });
-
     // Ressources (livres & ouvrages)
     Route::prefix('ressources')->name('resources.')->group(function () {
         Route::get('/', [AdminController::class, 'resources'])->name('index');
@@ -213,5 +195,67 @@ Route::prefix('admin')->name('admin.')->middleware('auth')->group(function () {
         Route::get('/{resource}/edit', [AdminController::class, 'editResource'])->name('edit');
         Route::put('/{resource}', [AdminController::class, 'updateResource'])->name('update');
         Route::delete('/{resource}', [AdminController::class, 'deleteResource'])->name('delete');
+    });
+
+    // ---------------- AUDIENCE ET DIFFUSION (administrateur et plus) ----------------
+    Route::middleware('role:admin')->group(function () {
+        // Rapports PDF
+        Route::get('/rapports', [AdminReportController::class, 'index'])->name('reports.index');
+        Route::post('/rapports', [AdminReportController::class, 'generate'])->middleware('throttle:20,1')->name('reports.generate');
+
+        // Synchronisation manuelle (ancien écran Vidéos)
+        Route::post('/videos/sync/{platform}', [AdminController::class, 'syncVideos'])->name('videos.sync');
+
+        // Réseaux sociaux : identifiants, test de connexion, synchronisation
+        Route::prefix('reseaux-sociaux')->name('social.')->group(function () {
+            Route::get('/', [AdminSocialController::class, 'index'])->name('index');
+            Route::get('/tiktok/connecter', [AdminSocialController::class, 'tiktokConnect'])->name('tiktok.connect');
+            Route::get('/tiktok/retour', [AdminSocialController::class, 'tiktokCallback'])->name('tiktok.callback');
+            Route::post('/tout-synchroniser', [AdminSocialController::class, 'syncAll'])->name('sync-all');
+            Route::put('/{platform}', [AdminSocialController::class, 'update'])->name('update');
+            Route::post('/{platform}/test', [AdminSocialController::class, 'test'])->name('test');
+            Route::post('/{platform}/sync', [AdminSocialController::class, 'sync'])->name('sync');
+        });
+
+        // Contacts
+        Route::prefix('contacts')->name('contacts.')->group(function () {
+            Route::get('/', [AdminController::class, 'contacts'])->name('index');
+            Route::get('/{contact}', [AdminController::class, 'viewContact'])->name('show');
+            Route::post('/{contact}/reply', [AdminController::class, 'replyContact'])->name('reply');
+            Route::post('/{contact}/archive', [AdminController::class, 'archiveContact'])->name('archive');
+        });
+
+        // Commentaires
+        Route::prefix('comments')->name('comments.')->group(function () {
+            Route::get('/', [AdminController::class, 'comments'])->name('index');
+            Route::post('/{comment}/reply', [AdminController::class, 'replyComment'])->name('reply');
+            Route::delete('/{comment}', [AdminController::class, 'deleteComment'])->name('delete');
+        });
+
+        // Newsletter
+        Route::prefix('newsletter')->name('newsletter.')->group(function () {
+            Route::get('/', [AdminController::class, 'newsletter'])->name('index');
+            Route::delete('/{subscriber}', [AdminController::class, 'deleteSubscriber'])->name('delete');
+        });
+    });
+
+    // ---------------- PARAMÈTRES (super administrateur) ----------------
+    Route::middleware('role:super_admin')->group(function () {
+        Route::prefix('parametres')->name('settings.')->group(function () {
+            Route::get('/', [AdminSettingsController::class, 'index'])->name('index');
+            Route::put('/groupe/{group}', [AdminSettingsController::class, 'update'])->name('update');
+            Route::post('/partenaires', [AdminSettingsController::class, 'storePartner'])->name('partners.store');
+            Route::put('/partenaires/{partner}', [AdminSettingsController::class, 'updatePartner'])->name('partners.update');
+            Route::delete('/partenaires/{partner}', [AdminSettingsController::class, 'deletePartner'])->name('partners.delete');
+        });
+
+        Route::prefix('comptes')->name('users.')->group(function () {
+            Route::get('/', [AdminUserController::class, 'index'])->name('index');
+            Route::get('/nouveau', [AdminUserController::class, 'create'])->name('create');
+            Route::post('/', [AdminUserController::class, 'store'])->name('store');
+            Route::get('/{user}/modifier', [AdminUserController::class, 'edit'])->name('edit');
+            Route::put('/{user}', [AdminUserController::class, 'update'])->name('update');
+            Route::delete('/{user}', [AdminUserController::class, 'destroy'])->name('delete');
+        });
     });
 });

@@ -24,7 +24,7 @@
     @endforeach
     <div class="wrap hero-inner">
         <div class="hero-copy">
-            <span class="hero-slogan">Hope Media RDC · En continu</span>
+            <span class="hero-slogan">{{ $site->site_name }} · En continu</span>
             <h1>Vidéos</h1>
             <p class="lead">Enseignements, témoignages et contenus spirituels sur YouTube, Facebook, Instagram et TikTok, réunis au même endroit.</p>
         </div>

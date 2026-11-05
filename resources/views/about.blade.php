@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'La chaîne')
-@section('meta_description', 'Hope Media RDC, la chaîne de la Parole qui éclaire : vidéos, enseignements, directs et actualités de la mission sur YouTube, Facebook, Instagram et TikTok.')
+@section('meta_description', $site->site_name . ' : ' . \Illuminate\Support\Str::limit($site->about_lead, 140))
 
 @section('content')
 <section class="hero compact" aria-labelledby="aboutTitle">
@@ -9,8 +9,8 @@
     <div class="wrap hero-inner">
         <div class="hero-copy">
             <span class="hero-slogan">La chaîne</span>
-            <h1 id="aboutTitle">Hope Media RDC</h1>
-            <p class="lead">Une voix pour l'espoir. Des prédications, des témoignages, des études bibliques et l'Écho de la mission, publiés chaque semaine sur toutes les grandes plateformes.</p>
+            <h1 id="aboutTitle">{{ $site->about_title }}</h1>
+            @if ($site->about_lead)<p class="lead">{{ $site->about_lead }}</p>@endif
             <div class="hero-cta">
                 <a class="btn btn-gold" href="{{ route('videos.index') }}"><i class="fa-solid fa-play" aria-hidden="true"></i>Regarder nos vidéos</a>
                 <a class="btn btn-ghost" href="{{ route('contact.create') }}"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i>Écrire à la rédaction</a>
@@ -36,9 +36,11 @@
 
     {{-- En chiffres --}}
     <section aria-labelledby="figTitle">
-        <div class="row-head"><h2 id="figTitle"><small>L'audience</small>Hope Media en chiffres</h2></div>
+        <div class="row-head"><h2 id="figTitle"><small>L'audience</small>{{ $site->site_name }} en chiffres</h2></div>
         <div class="counters">
-            @foreach ([['500K+', 'Abonnés cumulés', 'fa-users'], ['4', 'Plateformes actives', 'fa-tower-broadcast'], ['1000+', 'Vidéos publiées', 'fa-circle-play'], ['50+', 'Pays touchés', 'fa-earth-africa']] as [$n, $label, $icon])
+            @php $figureIcons = ['fa-users', 'fa-tower-broadcast', 'fa-circle-play', 'fa-earth-africa']; @endphp
+            @foreach (\App\Support\Site::pairs('about_figures') as $i => [$n, $label])
+                @php $icon = $figureIcons[$i % 4]; @endphp
                 <div class="counter" style="--pc:var(--hope)">
                     <span class="p-ico"><i class="fa-solid {{ $icon }}" aria-hidden="true"></i></span>
                     <span><strong>{{ $n }}</strong><small>{{ $label }}</small></span>
@@ -53,7 +55,7 @@
         <div class="about-grid">
             @foreach ([
                 ['fa-video', 'Productions vidéo', 'Prédications, études bibliques, témoignages et programmes spéciaux filmés et diffusés chaque semaine.', route('videos.index')],
-                ['fa-tower-broadcast', 'Diffusion en direct', 'Retransmission en live des cultes du sabbat, campagnes d\'évangélisation et événements spéciaux.', 'https://www.youtube.com/@Hopemedia-u4b/live'],
+                ['fa-tower-broadcast', 'Diffusion en direct', 'Retransmission en live des cultes du sabbat, campagnes d\'évangélisation et événements spéciaux.', ($site->live_enabled && $site->live_url) ? $site->live_url : route('videos.index')],
                 ['fa-headphones', 'Podcasts & Audio', 'Sermons et dévotions en format audio pour vous accompagner dans vos déplacements quotidiens.', route('posts.by-type', 'audio')],
                 ['fa-newspaper', 'Écho de la mission', 'Informations et nouvelles de la communauté adventiste en RDC et dans la région.', route('news.index')],
                 ['fa-hands-praying', 'Intercession & Prière', 'Service de demandes de prière disponible 24h/24 pour accompagner chaque fidèle dans ses besoins.', route('contact.prayer')],
@@ -76,33 +78,34 @@
             <div class="about-card">
                 <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
                 <h3>Notre mission</h3>
-                <p>Proclamer le message des trois anges (Apocalypse 14) à travers les médias numériques modernes, en touchant chaque foyer, chaque cœur et chaque nation avec l'espérance de l'Évangile.</p>
+                <p>{{ $site->about_mission }}</p>
             </div>
             <div class="about-card">
                 <i class="fa-solid fa-eye" aria-hidden="true"></i>
                 <h3>Notre vision</h3>
-                <p>Être la référence médiatique adventiste en Afrique Centrale, produisant du contenu spirituel de haute qualité qui prépare les gens au retour imminent de Jésus-Christ.</p>
+                <p>{{ $site->about_vision }}</p>
             </div>
             <div class="about-card">
                 <i class="fa-solid fa-gem" aria-hidden="true"></i>
                 <h3>Nos valeurs</h3>
                 <ul class="values">
-                    <li>Fidélité à la Parole de Dieu</li>
-                    <li>Excellence dans la production</li>
-                    <li>Service communautaire</li>
-                    <li>Intégrité et transparence</li>
-                    <li>Innovation au service de l'Évangile</li>
+                    @foreach (\App\Support\Site::lines('about_values') as $value)
+                        <li>{{ $value }}</li>
+                    @endforeach
                 </ul>
             </div>
         </div>
-        <p class="lead-text muted" style="margin-top:18px">Notre équipe de bénévoles et de techniciens dévoués travaille chaque jour pour produire du contenu de qualité qui édifie, encourage et transforme des vies. Nous croyons que la technologie est un outil puissant pour partager la Bonne Nouvelle.</p>
+        @if ($site->about_team)
+            <p class="lead-text muted" style="margin-top:18px">{{ $site->about_team }}</p>
+        @endif
     </section>
 
     {{-- Une production de l'Église --}}
     <section class="info-card" aria-labelledby="churchTitle">
-        <h2 id="churchTitle">Une production de l'Église Adventiste du 7ème Jour</h2>
-        <p class="muted" style="margin:0">Hope Media RDC est la plateforme médiatique officielle de l'Église Adventiste du 7ème Jour — Union du Congo Ouest (UCO). Fondée pour répondre à la mission évangélique dans un monde de plus en plus connecté, notre plateforme diffuse des contenus spirituels, bibliques et communautaires sur toutes les grandes plateformes numériques.</p>
-        <p class="muted" style="margin:0">L'Église Adventiste du 7ème Jour est un mouvement chrétien mondial présent dans plus de 200 pays avec plus de 21 millions de membres. En RDC, l'Église est organisée en plusieurs unions, dont l'Union du Congo Ouest (UCO) à laquelle Hope Media RDC est rattachée. Les adventistes du 7ème jour accordent une importance particulière à l'étude des Écritures, à la santé holistique, au sabbat (le 7ème jour) et à la préparation au retour de Christ. Hope Media RDC est fière de porter haut les valeurs de cette église et de les partager avec le monde entier à travers les outils numériques modernes.</p>
+        <h2 id="churchTitle">{{ $site->about_church_title }}</h2>
+        @foreach (\App\Support\Site::paragraphs('about_church_text') as $paragraph)
+            <p class="muted" style="margin:0">{{ $paragraph }}</p>
+        @endforeach
         <div class="about-grid">
             @foreach ([
                 ['fa-book-bible', 'Fondée sur la Bible', 'La Sainte Bible est notre seule règle de foi et de pratique.'],

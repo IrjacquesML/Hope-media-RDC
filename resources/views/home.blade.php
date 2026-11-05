@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Accueil')
-@section('meta_description', 'Hope Media RDC : vidéos, enseignements et actualités de la mission, en continu sur YouTube, Facebook, Instagram et TikTok. La Parole qui éclaire.')
+@section('meta_description', $site->seo_description)
 
 @php
     $latestVideos = $latestVideos ?? collect();
@@ -70,9 +70,9 @@
                     <a class="btn btn-ghost" href="{{ route('videos.index') }}"><i class="fa-solid fa-circle-play" aria-hidden="true"></i>Nos vidéos</a>
                 </div>
             @else
-                <span class="hero-slogan">Hope Media RDC</span>
-                <h1>La Parole qui éclaire</h1>
-                <p class="lead">Vidéos, enseignements et actualités de la mission, en continu sur nos réseaux.</p>
+                <span class="hero-slogan">{{ $site->home_kicker }}</span>
+                <h1>{{ $site->home_title }}</h1>
+                @if ($site->home_text)<p class="lead">{{ $site->home_text }}</p>@endif
                 <div class="hero-cta">
                     <a class="btn btn-gold" href="{{ route('videos.index') }}"><i class="fa-solid fa-play" aria-hidden="true"></i>Regarder</a>
                     <a class="btn btn-ghost" href="{{ route('posts.index') }}"><i class="fa-solid fa-book-open" aria-hidden="true"></i>Enseignements</a>

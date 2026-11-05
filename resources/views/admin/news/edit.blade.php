@@ -122,6 +122,9 @@
                 </div>
             </div>
 
+            <!-- Carrousel d'images -->
+            @include('admin.news._gallery')
+
             <!-- Article vedette -->
             <div class="flex items-center gap-3">
                 <input type="checkbox" name="is_featured" id="is_featured" value="1"

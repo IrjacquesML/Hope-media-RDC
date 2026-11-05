@@ -2,20 +2,25 @@
     // Les sections courtes (@section('x', '...')) sont déjà échappées par Blade : on les décode avant de les réafficher.
     $section = fn (string $name) => html_entity_decode(trim($__env->yieldContent($name)), ENT_QUOTES | ENT_HTML5, 'UTF-8');
     $pageTitle = $section('title');
-    $metaDescription = $section('meta_description') ?: "Hope Media RDC : vidéos, enseignements et actualités de la mission, en continu sur YouTube, Facebook, Instagram et TikTok.";
-    $ogImage = $section('og_image') ?: asset('images/hero-bible.jpg');
-    $youtubeChannel = 'https://www.youtube.com/@Hopemedia-u4b';
+    $metaDescription = $section('meta_description') ?: $site->seo_description;
+    $ogImage = $section('og_image') ?: ($site->seo_image ? asset($site->seo_image) : asset('images/hero-bible.jpg'));
+    $siteName = $site->site_name;
+    $liveUrl = $site->live_enabled ? $site->live_url : null;
+    $socialLinks = \App\Support\Site::socialLinks();
+    $partners = \App\Support\Site::partners();
+    $logoDark = $site->logo_dark ? asset($site->logo_dark) : null;
+    $logoLight = $site->logo_light ? asset($site->logo_light) : $logoDark;
     // Menu principal : uniquement les contenus (comme une chaîne). « À propos » et « Contact » sont dans le tiroir et le pied de page.
     $nav = [
-        ['home', 'home', 'Accueil', 'fa-house'],
-        ['videos.index', 'videos.*', 'Vidéos', 'fa-circle-play'],
-        ['posts.index', 'posts.*', 'Enseignements', 'fa-book-open'],
-        ['news.index', 'news.*', 'Écho de la mission', 'fa-newspaper'],
-        ['ressources.index', 'ressources.*', 'Ressources', 'fa-book'],
+        ['home', 'home', $site->nav_home, 'fa-house'],
+        ['videos.index', 'videos.*', $site->nav_videos, 'fa-circle-play'],
+        ['posts.index', 'posts.*', $site->nav_posts, 'fa-book-open'],
+        ['news.index', 'news.*', $site->nav_news, 'fa-newspaper'],
+        ['ressources.index', 'ressources.*', $site->nav_resources, 'fa-book'],
     ];
     $navMore = [
-        ['about', 'about', 'La chaîne', 'fa-tv'],
-        ['contact.create', 'contact.create', 'Écrire à la rédaction', 'fa-paper-plane'],
+        ['about', 'about', $site->nav_about, 'fa-tv'],
+        ['contact.create', 'contact.create', $site->nav_contact, 'fa-paper-plane'],
     ];
 @endphp
 <!DOCTYPE html>
@@ -23,23 +28,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>{{ $pageTitle ? $pageTitle . ' - ' : '' }}Hope Media RDC</title>
+    <title>{{ $pageTitle ? $pageTitle . ' - ' : '' }}{{ $siteName }}</title>
     <meta name="description" content="{{ $metaDescription }}">
-    <meta name="keywords" content="{{ $section('meta_keywords') ?: 'enseignements bibliques, église adventiste, prières, vidéos religieuses' }}">
+    <meta name="keywords" content="{{ $section('meta_keywords') ?: $site->seo_keywords }}">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#0B1530">
+    <meta name="theme-color" content="{{ $site->theme_color ?: '#0B1530' }}">
+    @if ($site->favicon)<link rel="icon" href="{{ asset($site->favicon) }}">@endif
     <link rel="canonical" href="{{ url()->current() }}">
 
     {{-- Partage WhatsApp / Facebook --}}
     <meta property="og:type" content="@yield('og_type', 'website')">
-    <meta property="og:site_name" content="Hope Media RDC">
-    <meta property="og:title" content="{{ $pageTitle ?: 'Hope Media RDC — La Parole qui éclaire' }}">
+    <meta property="og:site_name" content="{{ $siteName }}">
+    <meta property="og:title" content="{{ $pageTitle ?: $siteName . ' — ' . $site->slogan }}">
     <meta property="og:description" content="{{ $metaDescription }}">
     <meta property="og:image" content="{{ $ogImage }}">
     <meta property="og:url" content="{{ url()->current() }}">
     <meta property="og:locale" content="fr_CD">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="{{ $pageTitle ?: 'Hope Media RDC — La Parole qui éclaire' }}">
+    <meta name="twitter:title" content="{{ $pageTitle ?: $siteName . ' — ' . $site->slogan }}">
     <meta name="twitter:description" content="{{ $metaDescription }}">
     <meta name="twitter:image" content="{{ $ogImage }}">
 
@@ -59,9 +65,10 @@
     {{-- En-tête --}}
     <header class="header @yield('header_class')" id="header">
         <div class="wrap">
-            <a class="logo" href="{{ route('home') }}" aria-label="Hope Media RDC — Accueil">
-                <img class="l-dark" src="{{ asset('images/brand/logo-hope-media-negatif.webp') }}" alt="Hope Media Network-DRC" width="360" height="314">
-                <img class="l-light" src="{{ asset('images/brand/logo-hope-media.webp') }}" alt="" width="360" height="314">
+            <a class="logo" href="{{ route('home') }}" aria-label="{{ $siteName }} — Accueil">
+                @if ($logoDark)<img class="l-dark" src="{{ $logoDark }}" alt="{{ $site->site_full_name }}" width="360" height="314">@endif
+                @if ($logoLight)<img class="l-light" src="{{ $logoLight }}" alt="" width="360" height="314">@endif
+                @unless ($logoDark || $logoLight)<strong>{{ $siteName }}</strong>@endunless
             </a>
             <nav class="nav" aria-label="Navigation principale">
                 @foreach ($nav as [$route, $pattern, $label])
@@ -69,11 +76,17 @@
                 @endforeach
             </nav>
             <div class="h-actions">
-                <span class="clock" aria-hidden="true">Kinshasa <b id="clock">--:--</b></span>
-                <a class="live-badge" href="{{ $youtubeChannel }}/live" target="_blank" rel="noopener" aria-label="Direct sur YouTube (nouvel onglet)">
-                    <span class="dot" aria-hidden="true"></span>Direct
-                </a>
-                <a class="btn btn-gold h-pray" href="{{ route('contact.prayer') }}"><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Prière</a>
+                @if ($site->clock_enabled)
+                    <span class="clock" aria-hidden="true">{{ $site->clock_city }} <b id="clock">--:--</b></span>
+                @endif
+                @if ($liveUrl)
+                    <a class="live-badge" href="{{ $liveUrl }}" target="_blank" rel="noopener" aria-label="{{ $site->live_label }} (nouvel onglet)">
+                        <span class="dot" aria-hidden="true"></span>{{ $site->live_label }}
+                    </a>
+                @endif
+                @if ($site->prayer_enabled)
+                    <a class="btn btn-gold h-pray" href="{{ route('contact.prayer') }}"><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>{{ $site->prayer_label }}</a>
+                @endif
                 @auth
                     <a class="icon-btn h-admin" href="{{ route('admin.dashboard') }}" aria-label="Tableau de bord admin"><i class="fa-solid fa-gauge" aria-hidden="true"></i></a>
                 @endauth
@@ -94,7 +107,9 @@
             @foreach ($nav as [$route, $pattern, $label, $icon])
                 <a href="{{ route($route) }}" @if (request()->routeIs($pattern)) aria-current="page" @endif><i class="fa-solid {{ $icon }}" aria-hidden="true"></i>{{ $label }}</a>
             @endforeach
-            <a href="{{ $youtubeChannel }}/live" target="_blank" rel="noopener"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>Direct sur YouTube</a>
+            @if ($liveUrl)
+                <a href="{{ $liveUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>{{ $site->live_label }}</a>
+            @endif
             <a href="{{ route('contact.prayer') }}" @if (request()->routeIs('contact.prayer')) aria-current="page" @endif><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Ligne de prière</a>
             <hr>
             @foreach ($navMore as [$route, $pattern, $label, $icon])
@@ -140,11 +155,12 @@
         @yield('content')
 
         {{-- Newsletter (toutes les pages) --}}
+        @if ($site->newsletter_enabled)
         <section class="wrap" id="newsletter" aria-labelledby="nlTitle">
             <div class="news-box">
                 <div>
-                    <h2 id="nlTitle">Ne manquez aucune sortie</h2>
-                    <p>Les nouvelles vidéos, les enseignements et l'Écho de la mission, chaque semaine dans votre boîte mail.</p>
+                    <h2 id="nlTitle">{{ $site->newsletter_title }}</h2>
+                    <p>{{ $site->newsletter_text }}</p>
                 </div>
                 <form class="nl-form" action="{{ route('newsletter.subscribe') }}" method="POST">
                     @csrf
@@ -167,37 +183,79 @@
                 </form>
             </div>
         </section>
+        @endif
     </main>
 
-    {{-- Pied de page --}}
+    {{-- Pied de page (contenu géré dans Admin → Paramètres) --}}
     <footer class="site-footer">
         <div class="wrap">
             <div class="f-grid">
                 <div class="f-brand">
                     <div class="logos">
-                        <img class="l-dark" src="{{ asset('images/brand/logo-hope-media-negatif.webp') }}" alt="Hope Media Network-DRC" width="360" height="314" loading="lazy">
-                        <img class="l-light" src="{{ asset('images/brand/logo-hope-media.webp') }}" alt="Hope Media Network-DRC" width="360" height="314" loading="lazy">
-                        <img class="l-dark" src="{{ asset('images/brand/logo-adventiste-blanc.webp') }}" alt="Église Adventiste du Septième Jour" width="160" height="133" loading="lazy">
-                        <img class="l-light" src="{{ asset('images/brand/logo-adventiste.webp') }}" alt="Église Adventiste du Septième Jour" width="160" height="133" loading="lazy">
+                        @if ($logoDark)<img class="l-dark" src="{{ $logoDark }}" alt="{{ $site->site_full_name }}" width="360" height="314" loading="lazy">@endif
+                        @if ($logoLight)<img class="l-light" src="{{ $logoLight }}" alt="{{ $site->site_full_name }}" width="360" height="314" loading="lazy">@endif
+                        @php
+                            $logo2Dark = $site->footer_logo2_dark ? asset($site->footer_logo2_dark) : null;
+                            $logo2Light = $site->footer_logo2_light ? asset($site->footer_logo2_light) : $logo2Dark;
+                            $logo2Dark = $logo2Dark ?: $logo2Light;
+                        @endphp
+                        @if ($logo2Dark)<img class="l-dark" src="{{ $logo2Dark }}" alt="{{ $site->footer_logo2_alt }}" width="160" height="133" loading="lazy">@endif
+                        @if ($logo2Light)<img class="l-light" src="{{ $logo2Light }}" alt="{{ $site->footer_logo2_alt }}" width="160" height="133" loading="lazy">@endif
                     </div>
-                    <span class="f-slogan">La Parole qui éclaire</span>
-                    <p>Vidéos, enseignements et actualités de la mission, sur tous vos écrans et tous vos réseaux.</p>
+                    @if ($site->slogan)<span class="f-slogan">{{ $site->slogan }}</span>@endif
+                    @if ($site->footer_text)<p>{{ $site->footer_text }}</p>@endif
                 </div>
                 {{-- Pas de liens de navigation ici : ils sont déjà dans le menu principal et le menu ☰ --}}
                 <div>
-                    <h3>La rédaction</h3>
+                    <h3>{{ $site->footer_contact_title }}</h3>
                     <address>
-                        <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>01 Lubumbashi, Q. Pigeon, C. Ngaliema, Kinshasa</span>
-                        <span><i class="fa-solid fa-phone" aria-hidden="true"></i><a href="tel:+243852283241">+243 852 283 241</a></span>
-                        <span><i class="fa-solid fa-envelope" aria-hidden="true"></i><a href="mailto:hopemediasociaux@gmail.com">hopemediasociaux@gmail.com</a></span>
+                        @if ($site->contact_address)
+                            <span><i class="fa-solid fa-location-dot" aria-hidden="true"></i>@if ($site->contact_map_url)<a href="{{ $site->contact_map_url }}" target="_blank" rel="noopener">{{ $site->contact_address }}</a>@else{{ $site->contact_address }}@endif</span>
+                        @endif
+                        @foreach (array_filter([$site->contact_phone, $site->contact_phone2]) as $phone)
+                            <span><i class="fa-solid fa-phone" aria-hidden="true"></i><a href="{{ \App\Support\Site::telHref($phone) }}">{{ $phone }}</a></span>
+                        @endforeach
+                        @if ($site->contact_whatsapp)
+                            <span><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><a href="{{ \App\Support\Site::whatsappHref($site->contact_whatsapp) }}" target="_blank" rel="noopener">{{ $site->contact_whatsapp }}</a></span>
+                        @endif
+                        @if ($site->contact_email)
+                            <span><i class="fa-solid fa-envelope" aria-hidden="true"></i><a href="mailto:{{ $site->contact_email }}">{{ $site->contact_email }}</a></span>
+                        @endif
                     </address>
-                    <div class="f-social">
-                        <a class="p-youtube" href="{{ $youtubeChannel }}" target="_blank" rel="noopener" aria-label="Chaîne YouTube"><i class="fa-brands fa-youtube" aria-hidden="true"></i></a>
-                    </div>
+                    @if ($socialLinks)
+                        <div class="f-social">
+                            @foreach ($socialLinks as $key => [$label, $icon, $url])
+                                <a class="p-{{ $key }}" href="{{ $url }}" target="_blank" rel="noopener" aria-label="{{ $label }}"><i class="fa-brands {{ $icon }}" aria-hidden="true"></i></a>
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
+                @if ($partners->isNotEmpty())
+                    <div class="f-partners">
+                        <h3>{{ $site->footer_partners_title }}</h3>
+                        <ul>
+                            @foreach ($partners as $partner)
+                                <li>
+                                    @if ($partner->url)
+                                        <a href="{{ $partner->url }}" target="_blank" rel="noopener">
+                                            @if ($partner->logo)<img src="{{ asset($partner->logo) }}" alt="" loading="lazy">@endif
+                                            <span>{{ $partner->name }}</span>
+                                            <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i>
+                                        </a>
+                                    @else
+                                        <span class="f-partner-plain">
+                                            @if ($partner->logo)<img src="{{ asset($partner->logo) }}" alt="" loading="lazy">@endif
+                                            <span>{{ $partner->name }}</span>
+                                        </span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
             </div>
             <div class="f-bottom">
-                <span>&copy; {{ date('Y') }} Hope Media RDC. Église Adventiste du 7ème Jour - UCO</span>
+                <span>&copy; {{ date('Y') }} {{ $site->footer_copyright }}</span>
             </div>
         </div>
     </footer>
@@ -205,10 +263,12 @@
     {{-- Barre d'onglets (téléphone) --}}
     <nav class="tabbar" aria-label="Navigation mobile">
         <a href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="fa-solid fa-house" aria-hidden="true"></i>Accueil</a>
-        <a href="{{ route('videos.index') }}" @if (request()->routeIs('videos.*')) aria-current="page" @endif><i class="fa-solid fa-circle-play" aria-hidden="true"></i>Vidéos</a>
-        <a class="tab-live" href="{{ $youtubeChannel }}/live" target="_blank" rel="noopener"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>Direct</a>
+        <a href="{{ route('videos.index') }}" @if (request()->routeIs('videos.*')) aria-current="page" @endif><i class="fa-solid fa-circle-play" aria-hidden="true"></i>{{ $site->nav_videos }}</a>
+        @if ($liveUrl)
+            <a class="tab-live" href="{{ $liveUrl }}" target="_blank" rel="noopener"><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>{{ $site->live_label }}</a>
+        @endif
         <a href="{{ route('posts.index') }}" @if (request()->routeIs('posts.*')) aria-current="page" @endif><i class="fa-solid fa-book-open" aria-hidden="true"></i>Enseign.</a>
-        <a href="{{ route('contact.prayer') }}" @if (request()->routeIs('contact.prayer')) aria-current="page" @endif><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Prière</a>
+        <a href="{{ route('contact.prayer') }}" @if (request()->routeIs('contact.prayer')) aria-current="page" @endif><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>{{ $site->prayer_label }}</a>
     </nav>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

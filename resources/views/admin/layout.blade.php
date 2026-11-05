@@ -1,13 +1,59 @@
+@php
+    $me = Auth::user();
+    $badges = [];
+    if ($me?->hasRole('admin')) {
+        try {
+            $badges = \Illuminate\Support\Facades\Cache::remember('admin.badges', 60, fn () => [
+                'contacts' => \App\Models\Contact::where('status', 'new')->count(),
+                'comments' => \App\Models\Comment::where('is_approved', false)->where('is_admin_reply', false)->count(),
+            ]);
+        } catch (\Throwable) {
+            $badges = [];
+        }
+    }
+
+    // Menu : [section, [[route, motif actif, icône, libellé, rôle minimum, badge, paramètres]]]
+    $menu = [
+        [null, [
+            ['admin.dashboard', 'admin.dashboard', 'fa-gauge-high', 'Tableau de bord', 'editor'],
+        ]],
+        ['Contenus', [
+            ['admin.posts.index', 'admin.posts*', 'fa-book-open', 'Enseignements', 'editor'],
+            ['admin.news.index', 'admin.news*', 'fa-newspaper', 'Écho de la mission', 'editor'],
+            ['admin.videos.index', 'admin.videos*', 'fa-circle-play', 'Vidéos', 'editor'],
+            ['admin.resources.index', 'admin.resources*', 'fa-book', 'Ressources', 'editor'],
+            ['admin.hero-slides.index', 'admin.hero-slides*', 'fa-images', 'Carrousel d’accueil', 'editor'],
+            ['admin.categories.index', 'admin.categories*', 'fa-folder-tree', 'Catégories', 'editor'],
+            ['admin.medias.index', 'admin.medias*', 'fa-photo-film', 'Médias', 'editor'],
+        ]],
+        ['Audience', [
+            ['admin.contacts.index', 'admin.contacts*', 'fa-envelope', 'Messages et prières', 'admin', $badges['contacts'] ?? 0],
+            ['admin.comments.index', 'admin.comments*', 'fa-comments', 'Commentaires', 'admin', $badges['comments'] ?? 0],
+            ['admin.newsletter.index', 'admin.newsletter*', 'fa-envelope-open-text', 'Newsletter', 'admin'],
+        ]],
+        ['Diffusion', [
+            ['admin.social.index', 'admin.social*', 'fa-share-nodes', 'Synchronisation des réseaux', 'admin'],
+            ['admin.reports.index', 'admin.reports*', 'fa-file-pdf', 'Rapports PDF', 'admin'],
+        ]],
+        ['Administration', [
+            ['admin.settings.index', 'admin.settings*', 'fa-sliders', 'Paramètres du site', 'super_admin', 0, []],
+            ['admin.users.index', 'admin.users*', 'fa-users-gear', 'Comptes', 'super_admin'],
+        ]],
+    ];
+    $logo = $site->logo_dark ? asset($site->logo_dark) : null;
+@endphp
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title') - Admin Hope Media RDC</title>
-    
+    <meta name="robots" content="noindex, nofollow">
+    <title>@yield('title') - Admin {{ $site->site_name }}</title>
+    @if ($site->favicon)<link rel="icon" href="{{ asset($site->favicon) }}">@endif
+
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
     <style>
@@ -31,143 +77,135 @@
             input[type="checkbox"], input[type="radio"] { width: 20px !important; height: 20px !important; }
         }
         img, video, iframe { max-width: 100%; }
+        .side-link[aria-current="page"] { background: rgba(252, 163, 17, .14); color: #fff; box-shadow: inset 3px 0 0 #FCA311; }
+        .side-link[aria-current="page"] i { color: #FCA311; }
+        #adminSidebar::-webkit-scrollbar { width: 6px; }
+        #adminSidebar::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-100 text-slate-900">
+<body class="bg-slate-100 text-slate-900 antialiased">
     <div class="flex h-screen bg-slate-100">
         <!-- Fond sombre derrière le menu ouvert (mobile) -->
         <div id="adminOverlay" class="fixed inset-0 z-30 bg-black/50 hidden lg:hidden"></div>
 
-        <!-- Sidebar : menu coulissant sous 1024 px, fixe au-dessus -->
-        <aside id="adminSidebar" class="fixed inset-y-0 left-0 z-40 w-64 flex-shrink-0 overflow-y-auto pb-24 transform -translate-x-full transition-transform duration-200 lg:relative lg:translate-x-0 bg-gradient-to-b from-blue-600 to-blue-800 text-white shadow-lg">
-            <div class="p-6">
-                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2 text-2xl font-bold hover:opacity-80">
-                    <i class="fas fa-shield-alt"></i>
-                    <span>Admin Panel</span>
+        <!-- Menu latéral : coulissant sous 1024 px, fixe au-dessus -->
+        <aside id="adminSidebar" class="fixed inset-y-0 left-0 z-40 w-72 flex-shrink-0 overflow-y-auto flex flex-col transform -translate-x-full transition-transform duration-200 lg:relative lg:translate-x-0 bg-[#0B1530] text-slate-300">
+            <div class="px-5 pt-5 pb-4 border-b border-white/10">
+                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 hover:opacity-90">
+                    @if ($logo)
+                        <img src="{{ $logo }}" alt="" class="h-11 w-auto">
+                    @else
+                        <span class="w-11 h-11 rounded-lg bg-amber-400 text-[#0B1530] flex items-center justify-center font-black">HM</span>
+                    @endif
+                    <span class="leading-tight">
+                        <span class="block text-white font-bold">{{ $site->site_name }}</span>
+                        <span class="block text-xs text-slate-400">Administration</span>
+                    </span>
                 </a>
             </div>
-            
-            <nav class="mt-8 space-y-2 px-4">
-                <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.dashboard') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Dashboard</span>
-                </a>
-                
-                <a href="{{ route('admin.posts.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.posts*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-file-alt"></i>
-                    <span>Posts</span>
-                </a>
 
-                <a href="{{ route('admin.hero-slides.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.hero-slides*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-images"></i>
-                    <span>Carrousel Accueil</span>
-                </a>
-                
-                <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.categories*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-folder"></i>
-                    <span>Catégories</span>
-                </a>
-                
-                <a href="{{ route('admin.medias.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.medias*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-video"></i>
-                    <span>Médias</span>
-                </a>
-
-                <a href="{{ route('admin.videos.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.videos*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-sync-alt"></i>
-                    <span>Sync Réseaux</span>
-                </a>
-
-                <a href="{{ route('admin.social.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.social*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-share-nodes"></i>
-                    <span>Réseaux sociaux</span>
-                </a>
-                
-                <a href="{{ route('admin.contacts.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.contacts*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-envelope"></i>
-                    <span>Messages</span>
-                </a>
-
-                <a href="{{ route('admin.comments.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.comments*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-comments"></i>
-                    <span>Commentaires</span>
-                </a>
-                
-                <a href="{{ route('admin.news.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.news*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-newspaper"></i>
-                    <span>Écho de la mission</span>
-                </a>
-                
-                <a href="{{ route('admin.newsletter.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.newsletter*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-envelope-open-text"></i>
-                    <span>Newsletter</span>
-                </a>
-                
-                <a href="{{ route('admin.resources.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg {{ request()->routeIs('admin.resources*') ? 'bg-blue-900' : 'hover:bg-blue-700' }} transition">
-                    <i class="fas fa-book-open"></i>
-                    <span>Ressources</span>
-                </a>
+            <nav class="flex-1 px-3 py-4 space-y-5" aria-label="Menu d'administration">
+                @foreach ($menu as [$section, $items])
+                    @php $visible = array_filter($items, fn ($i) => $me?->hasRole($i[4])); @endphp
+                    @if ($visible)
+                        <div>
+                            @if ($section)
+                                <p class="px-3 mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">{{ $section }}</p>
+                            @endif
+                            <div class="space-y-0.5">
+                                @foreach ($visible as $item)
+                                    @php [$route, $pattern, $icon, $label] = $item; $badge = $item[5] ?? 0; @endphp
+                                    <a href="{{ route($route) }}" class="side-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 hover:text-white transition"
+                                       @if (request()->routeIs($pattern)) aria-current="page" @endif>
+                                        <i class="fas {{ $icon }} w-5 text-center text-slate-400"></i>
+                                        <span class="flex-1">{{ $label }}</span>
+                                        @if ($badge > 0)
+                                            <span class="min-w-[22px] h-[22px] px-1.5 rounded-full bg-amber-400 text-[#0B1530] text-xs font-bold flex items-center justify-center">{{ $badge > 99 ? '99+' : $badge }}</span>
+                                        @endif
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+                @endforeach
             </nav>
-            
-            <div class="absolute bottom-6 left-4 right-4">
-                <a href="{{ route('home') }}" class="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition w-full">
-                    <i class="fas fa-arrow-left"></i>
-                    <span>Site Public</span>
+
+            <div class="p-3 border-t border-white/10">
+                <a href="{{ route('home') }}" target="_blank" rel="noopener" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium hover:bg-white/5 hover:text-white transition">
+                    <i class="fas fa-arrow-up-right-from-square w-5 text-center text-slate-400"></i>
+                    <span>Voir le site public</span>
                 </a>
             </div>
         </aside>
-        
-        <!-- Main Content -->
+
+        <!-- Contenu principal -->
         <main class="flex-1 min-w-0 overflow-auto">
-            <!-- Top Bar -->
-            <div class="bg-white shadow-sm border-b border-slate-200 px-4 lg:px-8 py-3 lg:py-4 flex justify-between items-center gap-3 sticky top-0 z-20">
+            <!-- Barre du haut -->
+            <div class="bg-white/95 backdrop-blur border-b border-slate-200 px-4 lg:px-8 py-3 flex justify-between items-center gap-3 sticky top-0 z-20">
                 <div class="flex items-center gap-3 min-w-0">
                     <button type="button" id="adminMenuBtn" class="lg:hidden w-11 h-11 -ml-2 rounded-lg flex items-center justify-center text-slate-700 hover:bg-slate-100" aria-label="Ouvrir le menu" aria-controls="adminSidebar" aria-expanded="false">
                         <i class="fas fa-bars text-xl"></i>
                     </button>
                     <h1 class="text-lg lg:text-2xl font-bold text-slate-900 truncate">@yield('page_title')</h1>
                 </div>
-                <div class="flex items-center gap-4 flex-shrink-0">
-                    <span class="text-slate-600 hidden sm:inline">{{ Auth::user()->name ?? 'Admin' }}</span>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <a href="{{ route('home') }}" target="_blank" rel="noopener" class="hidden md:inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                        <i class="fas fa-globe"></i> Voir le site
+                    </a>
                     <div class="relative group">
-                        <button type="button" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold cursor-pointer hover:bg-blue-700 transition" aria-label="Compte">
-                            <i class="fas fa-user"></i>
+                        <button type="button" class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-full hover:bg-slate-100 transition" aria-label="Mon compte" aria-haspopup="true">
+                            <span class="w-9 h-9 rounded-full bg-[#1F3A93] text-white flex items-center justify-center text-sm font-bold">{{ $me?->initials }}</span>
+                            <span class="hidden sm:flex flex-col items-start leading-tight text-left">
+                                <span class="text-sm font-semibold text-slate-800 max-w-[160px] truncate">{{ $me?->name }}</span>
+                                <span class="text-[11px] text-slate-500">{{ $me?->role_label }}</span>
+                            </span>
+                            <i class="fas fa-chevron-down text-xs text-slate-400 hidden sm:inline"></i>
                         </button>
-                        <!-- Dropdown menu (survol sur ordinateur, toucher sur mobile) -->
-                        <div class="absolute right-0 mt-0 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition duration-200 z-50">
-                            <div class="px-4 py-3 border-b border-slate-200">
-                                <p class="text-sm text-slate-900 font-semibold">{{ Auth::user()->name ?? 'Admin' }}</p>
-                                <p class="text-xs text-slate-500">{{ Auth::user()->email ?? 'admin@hopemedia.cd' }}</p>
+                        <div class="absolute right-0 mt-1 w-60 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible group-focus-within:opacity-100 group-focus-within:visible transition duration-150 z-50">
+                            <div class="px-4 py-3 border-b border-slate-100">
+                                <p class="text-sm text-slate-900 font-semibold truncate">{{ $me?->name }}</p>
+                                <p class="text-xs text-slate-500 truncate">{{ $me?->email }}</p>
+                                <span class="inline-block mt-2 text-[11px] font-semibold px-2 py-0.5 rounded-full {{ $me?->role_color }}">{{ $me?->role_label }}</span>
                             </div>
-                            <form action="{{ route('auth.logout') }}" method="POST" class="p-2">
-                                @csrf
-                                <button type="submit" class="w-full flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition text-sm">
-                                    <i class="fas fa-sign-out-alt"></i>
-                                    <span>Déconnexion</span>
-                                </button>
-                            </form>
+                            <div class="p-2">
+                                <a href="{{ route('admin.profile.edit') }}" class="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg">
+                                    <i class="fas fa-user-pen w-4"></i> Mon profil et mot de passe
+                                </a>
+                                @if ($me?->isSuperAdmin())
+                                    <a href="{{ route('admin.settings.index') }}" class="flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-lg">
+                                        <i class="fas fa-sliders w-4"></i> Paramètres du site
+                                    </a>
+                                @endif
+                                <form action="{{ route('auth.logout') }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
+                                        <i class="fas fa-right-from-bracket w-4"></i> Déconnexion
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- Page Content -->
+
+            <!-- Contenu de la page -->
             <div class="p-4 lg:p-8">
-                <!-- Flash Messages -->
-                @if($message = Session::get('success'))
-                    <div class="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center gap-3">
-                        <i class="fas fa-check-circle"></i>
-                        <span>{{ $message }}</span>
+                @if ($message = Session::get('success'))
+                    <div class="mb-6 p-4 bg-green-50 border border-green-300 text-green-800 rounded-xl flex items-start gap-3" role="status">
+                        <i class="fas fa-circle-check mt-0.5"></i>
+                        <span class="flex-1">{{ $message }}</span>
+                        <button type="button" class="text-green-700/60 hover:text-green-900" onclick="this.parentElement.remove()" aria-label="Fermer"><i class="fas fa-xmark"></i></button>
                     </div>
                 @endif
-                
-                @if($message = Session::get('error'))
-                    <div class="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center gap-3">
-                        <i class="fas fa-exclamation-circle"></i>
-                        <span>{{ $message }}</span>
+
+                @if ($message = Session::get('error'))
+                    <div class="mb-6 p-4 bg-red-50 border border-red-300 text-red-800 rounded-xl flex items-start gap-3" role="alert">
+                        <i class="fas fa-circle-exclamation mt-0.5"></i>
+                        <span class="flex-1">{{ $message }}</span>
+                        <button type="button" class="text-red-700/60 hover:text-red-900" onclick="this.parentElement.remove()" aria-label="Fermer"><i class="fas fa-xmark"></i></button>
                     </div>
                 @endif
-                
+
                 @yield('content')
             </div>
         </main>

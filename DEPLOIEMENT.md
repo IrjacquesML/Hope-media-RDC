@@ -5,7 +5,7 @@ Ce qui est protégé :
 | Donnée | Où elle se trouve | Protection |
 |---|---|---|
 | Base de données | `database/database.sqlite` (ou MySQL) | Exclue de Git ; sauvegardée avant chaque mise à jour |
-| Images et fichiers envoyés depuis l'admin | `public/images/{posts,news,hero,resources}`, `storage/app/public` | Exclus de Git ; sauvegardés avant chaque mise à jour |
+| Images et fichiers envoyés depuis l'admin | `public/images/{posts,news,hero,resources,settings}`, `storage/app/public` | Exclus de Git ; sauvegardés avant chaque mise à jour |
 | Configuration (mots de passe, clés API) | `.env` | Exclue de Git ; sauvegardée avant chaque mise à jour |
 
 En plus, en production, Laravel **refuse** `migrate:fresh`, `migrate:refresh`, `migrate:reset` et `db:wipe` (commandes qui vident la base).
@@ -31,7 +31,7 @@ En plus, en production, Laravel **refuse** `migrate:fresh`, `migrate:refresh`, `
    * * * * * cd /chemin/du/site && php artisan schedule:run >> /dev/null 2>&1
    0 2 * * * cd /chemin/du/site && bash scripts/backup.sh >> storage/logs/backup.log 2>&1
    ```
-   - La première fait tourner la **synchronisation automatique des réseaux sociaux** (YouTube, Facebook, Instagram, TikTok, X), à la fréquence choisie par l'admin. Sans elle, seule la synchronisation manuelle (bouton « Synchroniser maintenant ») fonctionne. La page Admin → Réseaux sociaux indique si elle tourne bien.
+   - La première fait tourner la **synchronisation automatique des réseaux sociaux** (YouTube, Facebook, Instagram, TikTok, X), à la fréquence choisie par l'admin. Sans elle, les visites du site déclenchent la synchronisation (option « Synchroniser les réseaux sans tâche planifiée » dans Admin → Paramètres → Système), mais le cron reste plus fiable. La page Admin → Synchronisation des réseaux indique ce qui tourne.
    - La seconde sauvegarde la base chaque nuit à 2 h.
 
 Les sauvegardes sont rangées dans `~/hope-media-backups` (en dehors du dossier du site). Les 30 plus récentes sont conservées.

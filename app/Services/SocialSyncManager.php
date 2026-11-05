@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\SocialPlatform;
 use App\Support\SocialPlatforms;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -91,6 +92,10 @@ final class SocialSyncManager
         }
 
         try {
+            if ($platform === 'instagram') {
+                $this->refreshInstagramTokenIfNeeded();
+            }
+
             $service = $this->service($platform);
             $count = match ($platform) {
                 'youtube', 'tiktok' => $service->syncLatestVideos(),
@@ -194,6 +199,35 @@ final class SocialSyncManager
         $model = SocialPlatform::for($platform);
         $model->credentials = array_merge($model->credentials ?? [], array_filter($values, fn ($v) => $v !== null && $v !== ''));
         $model->save();
+    }
+
+    /**
+     * Les jetons Instagram (IGAA…) expirent au bout de 60 jours : on les prolonge
+     * automatiquement une fois par semaine. Un échec n'empêche pas la synchronisation.
+     */
+    private function refreshInstagramTokenIfNeeded(): void
+    {
+        $token = $this->credentials('instagram')['access_token'] ?? null;
+        if (! $token || ! str_starts_with($token, 'IG')) {
+            return;
+        }
+
+        $model = SocialPlatform::for('instagram');
+        $last = $model->credentials['token_refreshed_at'] ?? null;
+        if ($last && Carbon::parse($last)->gt(now()->subDays(7))) {
+            return;
+        }
+
+        try {
+            $this->storeCredentials('instagram', [
+                'access_token'       => InstagramSyncService::refreshLongLivedToken($token),
+                'token_refreshed_at' => now()->toIso8601String(),
+            ]);
+            Log::info('Instagram : jeton d’accès prolongé de 60 jours.');
+        } catch (\Throwable $e) {
+            // Jeton trop récent (< 24 h) ou déjà expiré : on réessaiera plus tard
+            Log::warning('Instagram : prolongation du jeton impossible.', ['error' => $e->getMessage()]);
+        }
     }
 
     private function envValue(string $platform, string $field): ?string

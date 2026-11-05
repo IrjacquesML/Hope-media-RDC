@@ -1,7 +1,7 @@
 @extends('admin.layout')
 
-@section('title', 'Vidéos & Sync')
-@section('page_title', 'Contenus réseaux sociaux')
+@section('title', 'Vidéos')
+@section('page_title', 'Vidéos des réseaux')
 
 @section('content')
     <div class="mb-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
@@ -11,12 +11,14 @@
                     <h3 class="font-bold text-slate-900">{{ $label }}</h3>
                     <span class="text-sm bg-slate-100 text-slate-700 px-2 py-1 rounded-full">{{ $counts[$key] ?? 0 }}</span>
                 </div>
-                <form action="{{ route('admin.videos.sync', $key) }}" method="POST">
-                    @csrf
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
-                        <i class="fas fa-sync-alt mr-1"></i> Synchroniser
-                    </button>
-                </form>
+                @if (auth()->user()->hasRole('admin'))
+                    <form action="{{ route('admin.social.sync', $key) }}" method="POST">
+                        @csrf
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition">
+                            <i class="fas fa-sync-alt mr-1"></i> Synchroniser
+                        </button>
+                    </form>
+                @endif
             </div>
         @endforeach
     </div>

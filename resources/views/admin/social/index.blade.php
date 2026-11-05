@@ -11,25 +11,54 @@
 @endphp
 
 {{-- État de la synchronisation automatique --}}
-@if ($schedulerOk)
-    <div class="mb-6 p-4 rounded-lg border border-green-300 bg-green-50 text-green-800 flex items-start gap-3">
-        <i class="fas fa-circle-check mt-1"></i>
-        <div>
-            <p class="font-semibold">La synchronisation automatique fonctionne.</p>
-            <p class="text-sm">Dernier passage du planificateur {{ $schedulerRunAt->diffForHumans() }}. Chaque réseau activé est synchronisé à la fréquence choisie ci-dessous.</p>
-        </div>
+<div class="flex flex-col lg:flex-row lg:items-start gap-4 mb-6">
+    <div class="flex-1 min-w-0">
+        @if ($schedulerOk && ! $autoWithoutCron)
+            <div class="p-4 rounded-xl border border-green-300 bg-green-50 text-green-800 flex items-start gap-3">
+                <i class="fas fa-circle-check mt-1"></i>
+                <div>
+                    <p class="font-semibold">La synchronisation automatique fonctionne (tâche planifiée du serveur).</p>
+                    <p class="text-sm">Dernier passage {{ $schedulerRunAt->diffForHumans() }}. Chaque réseau activé est synchronisé à la fréquence choisie ci-dessous.</p>
+                </div>
+            </div>
+        @elseif ($autoWithoutCron)
+            <div class="p-4 rounded-xl border border-blue-200 bg-blue-50 text-blue-900 flex items-start gap-3">
+                <i class="fas fa-bolt mt-1"></i>
+                <div class="min-w-0">
+                    <p class="font-semibold">Synchronisation automatique active{{ $schedulerOk ? '' : ' (mode sans cron)' }}.</p>
+                    <p class="text-sm">Les réseaux activés sont synchronisés à la fréquence choisie, déclenchés par les visites du site@if ($schedulerOk) ou par la tâche planifiée du serveur@endif.
+                        @if ($schedulerRunAt) Dernier passage {{ $schedulerRunAt->diffForHumans() }}.@else Premier passage à la prochaine visite.@endif
+                    </p>
+                    <details class="text-xs mt-2">
+                        <summary class="cursor-pointer font-semibold">Plus fiable : ajouter la tâche planifiée sur le serveur</summary>
+                        <p class="mt-1">Si un site reçoit peu de visites, demandez à la personne qui gère le serveur d’ajouter cette ligne (<code>crontab -e</code>) :</p>
+                        <code class="block mt-1 p-2 rounded bg-white border border-blue-200 break-all">{{ $cronLine }}</code>
+                    </details>
+                </div>
+            </div>
+        @else
+            <div class="p-4 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 flex items-start gap-3">
+                <i class="fas fa-triangle-exclamation mt-1"></i>
+                <div class="min-w-0">
+                    <p class="font-semibold">La synchronisation automatique n'est pas active sur ce serveur.</p>
+                    <p class="text-sm">Activez « Synchroniser les réseaux sans tâche planifiée » dans
+                        @if (auth()->user()->isSuperAdmin())<a class="underline font-semibold" href="{{ route('admin.settings.index', ['onglet' => 'system']) }}">Paramètres → Système</a>@else Paramètres → Système (super administrateur)@endif,
+                        ou ajoutez cette ligne au planificateur du serveur (<code>crontab -e</code>) :</p>
+                    <code class="block mt-2 p-2 rounded bg-white border border-amber-200 text-xs break-all">{{ $cronLine }}</code>
+                    @if ($schedulerRunAt)<p class="text-xs mt-2">Dernier passage connu : {{ $schedulerRunAt->diffForHumans() }}.</p>@endif
+                </div>
+            </div>
+        @endif
     </div>
-@else
-    <div class="mb-6 p-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 flex items-start gap-3">
-        <i class="fas fa-triangle-exclamation mt-1"></i>
-        <div class="min-w-0">
-            <p class="font-semibold">La synchronisation automatique n'est pas encore active sur ce serveur.</p>
-            <p class="text-sm">Vous pouvez synchroniser à la main avec les boutons « Synchroniser maintenant ». Pour l'automatique, la personne qui gère le serveur doit ajouter une fois cette ligne au planificateur (<code>crontab -e</code>) :</p>
-            <code class="block mt-2 p-2 rounded bg-white border border-amber-200 text-xs break-all">{{ $cronLine }}</code>
-            @if ($schedulerRunAt)<p class="text-xs mt-2">Dernier passage connu : {{ $schedulerRunAt->diffForHumans() }}.</p>@endif
-        </div>
-    </div>
-@endif
+    <form method="POST" action="{{ route('admin.social.sync-all') }}" class="flex-shrink-0">
+        @csrf
+        <button type="submit" class="w-full lg:w-auto bg-slate-900 text-white px-5 py-3 rounded-xl hover:bg-black transition font-semibold disabled:opacity-40 disabled:cursor-not-allowed" @disabled($configuredCount === 0)
+                onclick="this.disabled=true;this.textContent='Synchronisation en cours…';this.form.submit();">
+            <i class="fas fa-rotate mr-2"></i>Tout synchroniser maintenant
+        </button>
+        <p class="text-xs text-slate-500 mt-1 text-center">{{ $configuredCount }} réseau(x) configuré(s)</p>
+    </form>
+</div>
 
 <p class="mb-6 text-slate-600 text-sm max-w-3xl">
     Saisissez ici les accès de chaque réseau. Ils sont <strong>chiffrés</strong> dans la base de données et ne sont jamais réaffichés.
@@ -80,6 +109,24 @@
                 @isset($p['note'])
                     <p class="text-sm p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900"><i class="fas fa-lightbulb mr-1"></i>{{ $p['note'] }}</p>
                 @endisset
+
+                @if ($key === 'tiktok')
+                    <div class="text-sm p-3 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+                        <p class="font-semibold text-slate-800"><i class="fa-brands fa-tiktok mr-1"></i>Connexion du compte en un clic</p>
+                        <p class="text-slate-600">1. Enregistrez le <strong>Client Key</strong> et le <strong>Client Secret</strong>. 2. Dans votre app TikTok (Login Kit), ajoutez cette adresse de redirection :</p>
+                        <code class="block p-2 rounded bg-white border border-slate-200 text-xs break-all select-all">{{ $tiktokRedirect }}</code>
+                        <p class="text-slate-600">3. Cliquez ci-dessous et connectez-vous avec le compte TikTok de Hope Media : les jetons sont enregistrés tout seuls.</p>
+                        <a href="{{ route('admin.social.tiktok.connect') }}" class="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition font-semibold">
+                            <i class="fa-brands fa-tiktok"></i> {{ $p['model']->storedCredential('access_token') ? 'Reconnecter le compte TikTok' : 'Connecter le compte TikTok' }}
+                        </a>
+                        @if (! str_starts_with($tiktokRedirect, 'https://'))
+                            <p class="text-xs text-amber-700"><i class="fas fa-triangle-exclamation mr-1"></i>TikTok exige une adresse en https : cette étape fonctionne sur le site en ligne, pas en local.</p>
+                        @endif
+                    </div>
+                @endif
+                @if ($key === 'instagram')
+                    <p class="text-xs text-slate-500"><i class="fas fa-rotate mr-1"></i>Les jetons Instagram (IGAA…) sont prolongés automatiquement chaque semaine : plus besoin de les renouveler tous les 60 jours, tant que la synchronisation tourne.</p>
+                @endif
 
                 {{-- Réglages --}}
                 <form method="POST" action="{{ route('admin.social.update', $key) }}" class="flex flex-col gap-4" autocomplete="off">

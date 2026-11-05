@@ -50,10 +50,35 @@ class AdminController extends Controller
             'newsletter_subscribers' => NewsletterSubscription::where('is_active', true)->count(),
         ];
 
+        $stats += [
+            'pending_comments' => Comment::where('is_approved', false)->where('is_admin_reply', false)->count(),
+            'total_resources'  => Resource::count(),
+            'views_30d'        => (int) News::where('published_at', '>=', now()->subDays(30))->sum('views')
+                                + (int) Post::where('published_at', '>=', now()->subDays(30))->sum('views'),
+        ];
+
         $recent_posts = Post::with('category')->orderBy('created_at', 'desc')->take(5)->get();
+        $recent_news = News::orderBy('created_at', 'desc')->take(5)->get();
         $recent_contacts = Contact::orderBy('created_at', 'desc')->take(5)->get();
 
-        return view('admin.dashboard', compact('stats', 'recent_posts', 'recent_contacts'));
+        // État de la synchronisation de chaque réseau
+        $sync = [];
+        $manager = app(\App\Services\SocialSyncManager::class);
+        foreach (\App\Support\SocialPlatforms::all() as $key => $def) {
+            $model = \App\Models\SocialPlatform::for($key);
+            $sync[$key] = [
+                'label'      => $def['label'],
+                'icon'       => $def['icon'],
+                'color'      => $def['color'],
+                'configured' => $manager->isConfigured($key),
+                'enabled'    => $model->enabled,
+                'status'     => $model->last_status,
+                'last'       => $model->last_synced_at,
+                'videos'     => Video::where('platform', $key)->count(),
+            ];
+        }
+
+        return view('admin.dashboard', compact('stats', 'recent_posts', 'recent_news', 'recent_contacts', 'sync'));
     }
 
     // POSTS
@@ -362,10 +387,10 @@ class AdminController extends Controller
         if (filter_var($contact->email, FILTER_VALIDATE_EMAIL)) {
             try {
                 Mail::raw(
-                    "Bonjour {$contact->name},\n\n{$validated['reply']}\n\n— Hope Media RDC",
+                    "Bonjour {$contact->name},\n\n{$validated['reply']}\n\n— " . \App\Support\Site::get('site_name'),
                     function ($message) use ($contact) {
                         $message->to($contact->email, $contact->name)
-                            ->subject('Réponse — Hope Media RDC');
+                            ->subject('Réponse — ' . \App\Support\Site::get('site_name'));
                     }
                 );
                 $mailSent = true;
@@ -434,7 +459,7 @@ class AdminController extends Controller
             'published_at'   => 'nullable|date_format:Y-m-d\TH:i',
             'featured_image' => 'nullable|image|mimes:jpeg,png,webp|max:5120',
             'is_featured'    => 'nullable|boolean',
-        ]);
+        ] + $this->newsGalleryRules());
 
         if ($request->hasFile('featured_image')) {
             $this->ensureDirectory(public_path('images/news'));
@@ -457,7 +482,8 @@ class AdminController extends Controller
         }
 
         try {
-            News::create($validated);
+            $news = News::create($this->withoutGalleryFields($validated));
+            $this->syncNewsGallery($request, $news);
         } catch (\Exception $e) {
             Log::error('storeNews failed', ['error' => $e->getMessage()]);
             return back()->withInput()->with('error', 'Une erreur est survenue lors de la création de l\'article. Veuillez réessayer.');
@@ -468,6 +494,7 @@ class AdminController extends Controller
 
     public function editNews(News $news)
     {
+        $news->load('images');
         return view('admin.news.edit', compact('news'));
     }
 
@@ -484,7 +511,7 @@ class AdminController extends Controller
             'published_at'   => 'nullable|date_format:Y-m-d\TH:i',
             'featured_image' => 'nullable|image|mimes:jpeg,png,webp|max:5120',
             'is_featured'    => 'nullable|boolean',
-        ]);
+        ] + $this->newsGalleryRules());
 
         if ($request->hasFile('featured_image')) {
             if ($news->featured_image && file_exists(public_path($news->featured_image))) {
@@ -510,7 +537,8 @@ class AdminController extends Controller
         }
 
         try {
-            $news->update($validated);
+            $news->update($this->withoutGalleryFields($validated));
+            $this->syncNewsGallery($request, $news);
         } catch (\Exception $e) {
             Log::error('updateNews failed', ['error' => $e->getMessage()]);
             return back()->withInput()->with('error', 'Une erreur est survenue lors de la mise à jour. Veuillez réessayer.');
@@ -524,8 +552,82 @@ class AdminController extends Controller
         if ($news->featured_image && file_exists(public_path($news->featured_image))) {
             @unlink(public_path($news->featured_image));
         }
+        foreach ($news->images as $image) {
+            $this->deletePublicFile($image->image);
+        }
         $news->delete();
         return redirect()->route('admin.news.index')->with('success', 'Article supprimé!');
+    }
+
+    // Carrousel d'images d'un article (Écho de la mission)
+    private function newsGalleryRules(): array
+    {
+        return [
+            'gallery_images'      => 'nullable|array|max:20',
+            'gallery_images.*'    => 'image|mimes:jpeg,png,webp|max:5120',
+            'gallery_captions'    => 'nullable|array',
+            'gallery_captions.*'  => 'nullable|string|max:255',
+            'gallery_order'       => 'nullable|array',
+            'gallery_order.*'     => 'nullable|integer|min:0|max:9999',
+            'gallery_remove'      => 'nullable|array',
+            'gallery_remove.*'    => 'integer',
+        ];
+    }
+
+    private function withoutGalleryFields(array $validated): array
+    {
+        return collect($validated)->except([
+            'gallery_images', 'gallery_captions', 'gallery_order', 'gallery_remove',
+        ])->all();
+    }
+
+    private function syncNewsGallery(Request $request, News $news): void
+    {
+        // Suppression des images cochées (limitées à cet article)
+        $removeIds = array_map('intval', (array) $request->input('gallery_remove', []));
+        if ($removeIds) {
+            foreach ($news->images()->whereIn('id', $removeIds)->get() as $image) {
+                $this->deletePublicFile($image->image);
+                $image->delete();
+            }
+        }
+
+        // Mise à jour des légendes et de l'ordre des images existantes
+        $captions = (array) $request->input('gallery_captions', []);
+        $orders = (array) $request->input('gallery_order', []);
+        foreach ($news->images()->get() as $image) {
+            $changes = [];
+            if (array_key_exists($image->id, $captions)) {
+                $changes['caption'] = trim((string) $captions[$image->id]) ?: null;
+            }
+            if (array_key_exists($image->id, $orders) && $orders[$image->id] !== null && $orders[$image->id] !== '') {
+                $changes['sort_order'] = (int) $orders[$image->id];
+            }
+            if ($changes) {
+                $image->update($changes);
+            }
+        }
+
+        // Ajout des nouvelles images, placées à la fin du carrousel
+        if ($request->hasFile('gallery_images')) {
+            $this->ensureDirectory(public_path('images/news/gallery'));
+            $next = (int) $news->images()->max('sort_order') + 1;
+            foreach ($request->file('gallery_images') as $i => $file) {
+                $filename = time() . '_' . $i . '_' . preg_replace('/[^A-Za-z0-9._-]/', '_', $file->getClientOriginalName());
+                $file->move(public_path('images/news/gallery'), $filename);
+                $news->images()->create([
+                    'image'      => 'images/news/gallery/' . $filename,
+                    'sort_order' => $next++,
+                ]);
+            }
+        }
+    }
+
+    private function deletePublicFile(?string $path): void
+    {
+        if ($path && file_exists(public_path($path))) {
+            @unlink(public_path($path));
+        }
     }
 
     // CAROUSEL ACCUEIL (Hero slides)
@@ -650,7 +752,7 @@ class AdminController extends Controller
             'content' => 'required|string|max:2000',
         ]);
 
-        $adminName = Auth::user()?->name ?: 'Hope Media RDC';
+        $adminName = Auth::user()?->name ?: \App\Support\Site::get('site_name');
 
         Comment::create([
             'parent_id'        => $comment->id,

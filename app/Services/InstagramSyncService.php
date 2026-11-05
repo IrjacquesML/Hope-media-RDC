@@ -77,6 +77,26 @@ final class InstagramSyncService
         return $username ? '@' . $username : throw new \RuntimeException('Compte Instagram introuvable.');
     }
 
+    /**
+     * Renouvelle un jeton « Instagram Login » longue durée (IGAA…) pour 60 jours de plus.
+     * Le jeton doit avoir plus de 24 h et ne pas être expiré.
+     *
+     * @return string Nouveau jeton.
+     */
+    public static function refreshLongLivedToken(string $token): string
+    {
+        $response = Http::timeout(15)->get('https://graph.instagram.com/refresh_access_token', [
+            'grant_type'   => 'ig_refresh_token',
+            'access_token' => $token,
+        ]);
+
+        if ($response->failed() || empty($response->json('access_token'))) {
+            throw new \RuntimeException('Instagram : renouvellement du jeton impossible. ' . ($response->json('error.message') ?? ''));
+        }
+
+        return (string) $response->json('access_token');
+    }
+
     // -------------------------------------------------------------------------
     // Méthodes privées
     // -------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Écrire à la rédaction')
-@section('meta_description', 'Contactez Hope Media RDC pour toute question, demande de prière ou témoignage')
+@section('meta_description', 'Contactez ' . $site->site_name . ' pour toute question, demande de prière ou témoignage')
 
 @section('content')
 <header class="page-head">
@@ -75,12 +75,23 @@
         </form>
 
         <aside class="info-card" aria-labelledby="coordTitle">
-            <h2 id="coordTitle">La rédaction</h2>
+            <h2 id="coordTitle">{{ $site->footer_contact_title }}</h2>
             <ul>
-                <li><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span><small>Adresse</small>01 Lubumbashi, Q. Pigeon, C. Ngaliema, Kinshasa</span></li>
-                <li><i class="fa-solid fa-phone" aria-hidden="true"></i><span><small>Téléphone</small><a href="tel:+243852283241">+243 852 283 241</a></span></li>
-                <li><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><small>Email</small><a href="mailto:hopemediasociaux@gmail.com">hopemediasociaux@gmail.com</a></span></li>
-                <li><i class="fa-regular fa-clock" aria-hidden="true"></i><span><small>Horaires de la rédaction</small>Lundi - Vendredi : 9h00 - 17h00<br>Samedi : Fermé<br>Dimanche : 9h00 - 12h00</span></li>
+                @if ($site->contact_address)
+                    <li><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span><small>Adresse</small>@if ($site->contact_map_url)<a href="{{ $site->contact_map_url }}" target="_blank" rel="noopener">{{ $site->contact_address }}</a>@else{{ $site->contact_address }}@endif</span></li>
+                @endif
+                @foreach (array_filter([$site->contact_phone, $site->contact_phone2]) as $phone)
+                    <li><i class="fa-solid fa-phone" aria-hidden="true"></i><span><small>Téléphone</small><a href="{{ \App\Support\Site::telHref($phone) }}">{{ $phone }}</a></span></li>
+                @endforeach
+                @if ($site->contact_whatsapp)
+                    <li><i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span><small>WhatsApp</small><a href="{{ \App\Support\Site::whatsappHref($site->contact_whatsapp) }}" target="_blank" rel="noopener">{{ $site->contact_whatsapp }}</a></span></li>
+                @endif
+                @if ($site->contact_email)
+                    <li><i class="fa-solid fa-envelope" aria-hidden="true"></i><span><small>Email</small><a href="mailto:{{ $site->contact_email }}">{{ $site->contact_email }}</a></span></li>
+                @endif
+                @if ($hours = \App\Support\Site::lines('contact_hours'))
+                    <li><i class="fa-regular fa-clock" aria-hidden="true"></i><span><small>Horaires de la rédaction</small>{!! implode('<br>', array_map('e', $hours)) !!}</span></li>
+                @endif
             </ul>
             <a class="btn btn-line" href="{{ route('contact.prayer') }}"><i class="fa-solid fa-hands-praying" aria-hidden="true"></i>Ligne de prière</a>
         </aside>
