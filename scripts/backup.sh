@@ -23,7 +23,8 @@ chmod 700 "$BACKUP_DIR"
 
 # Lit une valeur du .env (sans guillemets). Renvoie une chaîne vide si la clé est absente.
 env_get() {
-    { grep -E "^$1=" "$APP_DIR/.env" || true; } | tail -n 1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | tr -d '\r'
+    # Les espaces en début de ligne sont tolérés (comme le fait Laravel)
+    { grep -E "^[[:space:]]*$1[[:space:]]*=" "$APP_DIR/.env" || true; } | tail -n 1 | cut -d= -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" | tr -d '\r'
 }
 
 # Message clair si une étape échoue
@@ -49,8 +50,13 @@ case "$CONNECTION" in
         ;;
     mysql|mariadb)
         DB_OUT="$BACKUP_DIR/db-$STAMP.sql.gz"
+        # Valeurs absentes du .env : mêmes valeurs par défaut que config/database.php
+        DB_H="$(env_get DB_HOST)";     DB_H="${DB_H:-127.0.0.1}"
+        DB_P="$(env_get DB_PORT)";     DB_P="${DB_P:-3306}"
+        DB_U="$(env_get DB_USERNAME)"; DB_U="${DB_U:-root}"
+        DB_N="$(env_get DB_DATABASE)"; DB_N="${DB_N:-laravel}"
         MYSQL_PWD="$(env_get DB_PASSWORD)" mysqldump --single-transaction --routines --no-tablespaces \
-            -h "$(env_get DB_HOST)" -P "$(env_get DB_PORT)" -u "$(env_get DB_USERNAME)" "$(env_get DB_DATABASE)" \
+            -h "$DB_H" -P "$DB_P" -u "$DB_U" "$DB_N" \
             | gzip > "$DB_OUT"
         ;;
     *)
